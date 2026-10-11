@@ -5,3 +5,4 @@
 /docs/catalog/
 .venv/
 __pycache__/
+.wrangler/

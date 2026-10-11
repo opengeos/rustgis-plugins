@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""Uploads the packages a build made (dist/new.txt) to the R2 bucket behind packages.rustgis.app.
+
+    CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... python scripts/upload.py
+
+Published packages never change: a package already in the bucket with the same bytes is skipped,
+and one with different bytes stops the upload (bump the plugin's version instead). Each upload
+is downloaded again and checked against its SHA-256. Run this before deploying the registry, so
+registry.json never lists a package the bucket can't serve.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DIST = ROOT / "dist"
+BUCKET = "rustgis-plugins"
+PACKAGES_URL = "https://packages.rustgis.app"
+
+
+def fetch(url: str) -> bytes | None:
+    """Downloads a package from the bucket's domain, bypassing caches.
+
+    Args:
+        url: The package's URL.
+
+    Returns:
+        Its bytes, or None when the bucket doesn't have it.
+    """
+    req = urllib.request.Request(f"{url}?check", headers={"User-Agent": "rustgis-plugins-upload", "Cache-Control": "no-cache"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def main() -> int:
+    """Uploads every new package; returns the exit code."""
+    names = [n.strip() for n in (DIST / "new.txt").read_text().splitlines() if n.strip()]
+    failures = 0
+    for name in names:
+        path = DIST / "packages" / name
+        data = path.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        url = f"{PACKAGES_URL}/{name}"
+        have = fetch(url)
+        if have is not None:
+            if hashlib.sha256(have).hexdigest() == digest:
+                print(f"{name}: already published")
+            else:
+                print(f"error: {name} is already published with different contents; bump the plugin's version", file=sys.stderr)
+                failures += 1
+            continue
+        subprocess.run(
+            [
+                "npx", "--yes", "wrangler@4", "r2", "object", "put", f"{BUCKET}/{name}", "--file", str(path), "--remote",
+                "--content-type", "application/zip", "--cache-control", "public, max-age=31536000, immutable",
+            ],
+            check=True,
+        )
+        got = fetch(url)
+        if got is None or hashlib.sha256(got).hexdigest() != digest:
+            print(f"error: {name} doesn't read back from {url} as uploaded", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"{name}: uploaded ({len(data):,} bytes)")
+    print(f"{len(names)} packages, {failures} failures")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

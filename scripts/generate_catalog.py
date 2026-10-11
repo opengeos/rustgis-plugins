@@ -15,17 +15,14 @@ are shown as typed and never take effect.
 from __future__ import annotations
 
 import html
-import io
 import json
 import re
-import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 DOCS = ROOT / "docs"
-SITE_URL = "https://plugins.rustgis.app"
 PLUGIN_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
 MARKDOWN_SPECIAL = re.compile(r"([\\`*_{}\[\]()#+\-.!|~<>])")
 KINDS = {
@@ -101,23 +98,14 @@ def tags(categories: list[object]) -> str:
     return " ".join(f"`{c}`" for c in categories if isinstance(c, str) and re.fullmatch(r"[A-Za-z][A-Za-z ]*", c))
 
 
-def manifest_of(entry: dict) -> dict:
-    """Reads plugin.json from the entry's package in dist/.
-
-    Args:
-        entry: A registry.json entry.
+def load_manifests() -> dict:
+    """Each plugin's manifest, from the package index the build wrote (dist/packages.json).
 
     Returns:
-        The manifest, or an empty dict when the package can't be read.
+        Manifests by plugin id.
     """
-    path = DIST / str(entry.get("package", ""))
-    try:
-        with zipfile.ZipFile(io.BytesIO(path.read_bytes())) as z:
-            names = z.namelist()
-            name = "plugin.json" if "plugin.json" in names else next(n for n in names if n.endswith("/plugin.json"))
-            return json.loads(z.read(name))
-    except (OSError, StopIteration, KeyError, zipfile.BadZipFile, json.JSONDecodeError):
-        return {}
+    index = json.loads((DIST / "packages.json").read_text())
+    return {p["id"]: p.get("manifest") or {} for p in index.get("plugins", [])}
 
 
 def size(n: int) -> str:
@@ -186,7 +174,7 @@ def render_card(entry: dict, manifest: dict) -> str:
         lines += [f"    {tags(entry['categories'])}", ""]
     links = [
         f"[:material-information-outline: Details](catalog/{entry['id']}.md)",
-        link(":material-download: Download", f"{SITE_URL}/{entry['package']}"),
+        link(":material-download: Download", entry["package"]),
         link(":octicons-mark-github-16: Homepage", entry.get("homepage"), "{ target=_blank }"),
     ]
     lines += ["    " + " · ".join(x for x in links if x), ""]
@@ -260,7 +248,7 @@ def render_page(entry: dict, manifest: dict) -> str:
         front += f"description: {json.dumps(html.escape(' '.join(entry['description'].split())))}\n"
     front += "---\n\n"
     buttons = [
-        f"[:material-download: Download {text(entry.get('version', ''))}]({SITE_URL}/{entry['package']}){{ .md-button .md-button--primary }}"
+        f"[:material-download: Download {text(entry.get('version', ''))}]({safe_url(entry['package'])}){{ .md-button .md-button--primary }}"
     ]
     home = link(":octicons-mark-github-16: Homepage", entry.get("homepage"), "{ .md-button target=_blank }")
     if home:
@@ -359,11 +347,12 @@ def render_page(entry: dict, manifest: dict) -> str:
 def main() -> None:
     """Writes docs/catalog.md and docs/catalog/<id>.md from dist/registry.json."""
     registry = json.loads((DIST / "registry.json").read_text())
+    manifests = load_manifests()
     entries = []
     for e in registry.get("plugins", []):
-        if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not str(e.get("package", "")).startswith("packages/"):
+        if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not safe_url(e.get("package")):
             raise SystemExit(f"refusing to write a page for {e.get('id')!r}")
-        entries.append((e, manifest_of(e)))
+        entries.append((e, manifests.get(e["id"], {})))
     (DOCS / "catalog.md").write_text(render_catalog(entries))
     pages = DOCS / "catalog"
     pages.mkdir(exist_ok=True)

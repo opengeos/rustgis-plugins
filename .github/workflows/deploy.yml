@@ -26,16 +26,24 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
-      - name: Build the registry
+      - name: Build the registry (only plugins whose version changed)
         run: python3 scripts/build.py --check
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      # Before the registry is deployed, so it never lists a package the bucket can't serve.
+      - name: Upload new packages to packages.rustgis.app
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_R2_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 scripts/upload.py
       - name: Build the site
         run: |
           python3 scripts/generate_catalog.py
           uv venv --python 3.12
           uv pip install -r requirements.txt
           .venv/bin/zensical build
-          cp dist/registry.json dist/blocklist.json site/
-          cp -r dist/packages site/packages
+          cp dist/registry.json dist/blocklist.json dist/packages.json site/
           cp CNAME site/CNAME
           touch site/.nojekyll
       - uses: actions/upload-pages-artifact@v5

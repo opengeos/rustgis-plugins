@@ -42,7 +42,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Build, package and check every plugin
+      # Only plugins whose version (or source) changed are built and run; the rest are reused
+      # from packages.rustgis.app.
+      - name: Build, package and check the plugins that changed
         run: python scripts/build.py --check
       - name: RustGIS commit to test against
         id: rustgis
@@ -57,7 +59,7 @@ jobs:
         run: |
           cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ steps.rustgis.outputs.sha }}" rustgis-cli --root ~/rustgis-cli-root
           mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
-      - name: Run every plugin in RustGIS
+      - name: Run the changed plugins in RustGIS
         run: python scripts/smoke.py --cli ~/rustgis-cli/rustgis-cli
       - uses: actions/upload-artifact@v4
         with:

@@ -18,8 +18,9 @@ for the design, the permissions and the ABI.
 | [`plugins/map-explorer/`](plugins/map-explorer) | **Map Explorer**: a ribbon tab of its own (groups, a menu, a tool button) for jumping around the map, selecting and summarizing |
 | [`registry/`](registry) | one file per listed plugin |
 | [`blocklist.json`](blocklist.json) | withdrawn plugins |
-| [`scripts/build.py`](scripts/build.py) | builds, checks and packages everything into `dist/` |
-| [`scripts/smoke.py`](scripts/smoke.py) | runs every package in `rustgis-cli` |
+| [`scripts/build.py`](scripts/build.py) | builds, checks and packages what changed into `dist/` |
+| [`scripts/upload.py`](scripts/upload.py) | uploads new packages to `packages.rustgis.app` |
+| [`scripts/smoke.py`](scripts/smoke.py) | runs new packages (or `--all`) in `rustgis-cli` |
 | [`docs/`](docs) | the site at plugins.rustgis.app |
 
 ## Build
@@ -43,7 +44,11 @@ with its SHA-256.
 
 ## Deployment
 
-Each push to `main` builds the registry and the docs and publishes them to GitHub Pages at
-`plugins.rustgis.app` (the `CNAME` file; DNS is a CNAME to `opengeos.github.io`).
+- **Two hosts:**
+  - `plugins.rustgis.app` (GitHub Pages; the `CNAME` file, with DNS a CNAME to `opengeos.github.io`) serves the site, `registry.json`, `blocklist.json` and `packages.json`.
+  - `packages.rustgis.app` serves the packages from the `rustgis-plugins` Cloudflare R2 bucket, at `<id>/<id>-<version>.rgplugin`. Packages never change once published, and every version stays available.
+- **Incremental builds:** each push to `main` builds only what changed. `scripts/build.py` reads the previous deploy's `packages.json` and builds or downloads only plugins whose version or source changed. An in-repo plugin whose files changed without a version bump fails the check.
+- **Upload before deploy:** `scripts/upload.py` puts the new packages in the bucket, checking each one back, before the registry is deployed. It needs the `CLOUDFLARE_R2_TOKEN` secret (a Cloudflare API token with *Workers R2 Storage: Edit*) and `CLOUDFLARE_ACCOUNT_ID`.
+- **CI:** pull requests build and run only the plugins they change. The **Nightly** workflow runs every published plugin in the latest RustGIS.
 
 Code is MIT licensed. Each plugin states its own license in its `plugin.json`.

@@ -1,0 +1,42 @@
+name: Nightly
+
+# Every published package, in the latest RustGIS: a change in RustGIS that breaks a plugin shows
+# up here, not when someone next touches that plugin. GitHub emails a failed scheduled run to
+# whoever last changed this schedule.
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Read the registry (building only what changed)
+        run: python scripts/build.py --check
+      - name: RustGIS commit to test against
+        id: rustgis
+        run: echo "sha=$(git ls-remote https://github.com/opengeos/RustGIS main | cut -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: cli
+        with:
+          path: ~/rustgis-cli
+          key: rustgis-cli-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
+      - name: Build rustgis-cli
+        if: steps.cli.outputs.cache-hit != 'true'
+        run: |
+          cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ steps.rustgis.outputs.sha }}" rustgis-cli --root ~/rustgis-cli-root
+          mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
+      - name: Run every published plugin in RustGIS
+        run: python scripts/smoke.py --all --cli ~/rustgis-cli/rustgis-cli

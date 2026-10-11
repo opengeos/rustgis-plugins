@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Loads every package in dist/ into RustGIS and runs it on the World Atlas sample.
+"""Loads packages into RustGIS and runs them on the World Atlas sample.
 
-    python scripts/smoke.py [--cli path/to/rustgis-cli]
+    python scripts/smoke.py [--cli path/to/rustgis-cli]         # the packages this build made
+    python scripts/smoke.py --all [--cli path/to/rustgis-cli]   # every listed package (nightly)
 
 For each plugin: RustGIS must load it and list its commands; each tool runs with its defaults
 (layer parameters get a sample layer of the right kind) and must succeed; each command that
@@ -18,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -39,12 +41,22 @@ def run(cli: str, package: Path, cmds: list[str], plugins_dir: str) -> subproces
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cli", default=os.environ.get("RUSTGIS_CLI") or shutil.which("rustgis-cli") or "rustgis-cli")
+    ap.add_argument("--all", action="store_true", help="every listed package, downloading published ones")
     args = ap.parse_args()
     registry = json.loads((DIST / "registry.json").read_text())
     failures = 0
-    with tempfile.TemporaryDirectory() as plugins_dir:
+    with tempfile.TemporaryDirectory() as plugins_dir, tempfile.TemporaryDirectory() as downloads:
         for e in registry["plugins"]:
-            package = DIST / e["package"]
+            # Built by this run, or (with --all) downloaded from the bucket.
+            file_name = e["package"].rsplit("/", 1)[-1]
+            package = DIST / "packages" / e["id"] / file_name
+            if not package.is_file():
+                if not args.all:
+                    continue
+                package = Path(downloads) / file_name
+                req = urllib.request.Request(e["package"], headers={"User-Agent": "rustgis-plugins-smoke"})
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    package.write_bytes(r.read())
             print(f"== {e['id']} {e['version']}")
             listed = run(args.cli, package, ["info.commands"], plugins_dir)
             if listed.returncode != 0:

@@ -32,8 +32,9 @@ Attach a `.rgplugin` package to a release in your own repository, and add:
 ```
 
 CI downloads the package, checks the hash, and validates it. Once merged, the package is served
-from `plugins.rustgis.app/packages/my-plugin/` with that hash, so later edits to your release
-don't change what people install. A new version needs a new `version` and a new `source`.
+from `packages.rustgis.app/my-plugin/my-plugin-<version>.rgplugin` with that hash, so later
+edits to your release don't change what people install. A new version needs a new `version` and
+a new `source`.
 
 ## What CI checks
 
@@ -61,7 +62,9 @@ Terrain, Utilities, Vector, Visualization.
 ## Updating and withdrawing
 
 Bump `version` in `plugin.json` (and `source` for a plugin hosted elsewhere). RustGIS shows an
-**Update** button to everyone with an older version.
+**Update** button to everyone with an older version. Published packages never change, so CI
+refuses an in-repository plugin whose files changed without a version bump. Every published
+version stays available at its URL.
 
 Maintainers withdraw a plugin by adding it to `blocklist.json`. `{"id": "...", "reason": "..."}`
 blocks every version; adding `"sha256"` blocks only that package. RustGIS turns blocked plugins
@@ -71,5 +74,9 @@ off and refuses to install them again. Report a malicious plugin privately (see
 ## registry.json
 
 Each entry has `id`, `name`, `version`, `description`, `author`, `homepage`, `license`,
-`categories`, `package` (a path relative to the registry), `sha256`, `size`,
-`minRustgisVersion`, `permissions`, and the labels of its `commands` and names of its `tools`.
+`categories`, `package` (the package's URL on `packages.rustgis.app`), `sha256`, `size`,
+`minRustgisVersion`, `permissions`, the labels of its `commands`, the names of its `tools` and
+its `tab`.
+
+`packages.json` beside it is the build's index: each plugin's package, full manifest and where it
+came from. The next build reads it to rebuild only what changed.
