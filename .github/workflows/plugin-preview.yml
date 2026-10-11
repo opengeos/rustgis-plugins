@@ -107,7 +107,9 @@ jobs:
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          python3 scripts/preview.py --site preview-data "$PR" "$RUN_SHA" site
+          # The other plugins are listed as published, not as the artifact says.
+          curl -sf --retry 3 https://plugins.rustgis.app/registry.json -o published.json
+          python3 scripts/preview.py --site preview-data "$PR" "$RUN_SHA" site --published published.json
           echo "plugins=$(find site/packages -name '*.rgplugin' | wc -l)" >> "$GITHUB_OUTPUT"
 
       - name: Hand the site to the publish job
@@ -199,9 +201,7 @@ jobs:
               marker,
               '### 🧩 Plugin preview',
               '',
-              n > 0
-                ? `**[Open in RustGIS](${open})**: web.rustgis.app's Plugin Manager on this pull request's registry. Install the plugin from **Browse**; RustGIS shows its permissions first.`
-                : 'This pull request builds no new plugin package, so the preview lists the published plugins only.',
+              `**[Open in RustGIS](${open})**: web.rustgis.app's Plugin Manager on this pull request's registry (${n} plugin package${n === 1 ? '' : 's'} from this pull request). Install from **Browse**; RustGIS shows the permissions first.`,
               '',
               '| Item | Value |',
               '| --- | --- |',
@@ -245,7 +245,10 @@ jobs:
           ids=""
           page=1
           while :; do
-            got=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=25&page=$page&env=preview")
+            if ! got=$(curl -sf --retry 3 -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=25&page=$page&env=preview"); then
+              echo "::warning::Could not list $BRANCH's deployments (page $page); some may remain."
+              break
+            fi
             [ "$(jq '.result | length' <<< "$got")" -gt 0 ] || break
             ids+=" $(jq -r --arg b "$BRANCH" '.result[] | select(.deployment_trigger.metadata.branch == $b) | .id' <<< "$got")"
             page=$((page + 1))
@@ -255,7 +258,7 @@ jobs:
             fi
           done
           for id in $ids; do
-            if curl -sf -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null; then
+            if curl -sf --retry 3 -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null; then
               echo "deleted $id"
             else
               echo "::warning::Could not delete deployment $id of $BRANCH."

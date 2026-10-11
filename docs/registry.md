@@ -58,7 +58,8 @@ https://pr-<N>.rustgis-plugins-preview.pages.dev
 ```
 
 The link opens [web.rustgis.app](https://web.rustgis.app)'s Plugin Manager on the preview's
-registry: every published plugin, with the pull request's new packages served from the preview.
+registry (its `?registry=` address parameter): every published plugin, with the pull request's
+new packages served from the preview.
 Install the plugin from **Browse**; RustGIS shows its permissions first. On the desktop, set
 **Plugin Manager › Settings › Plugin registry** to the preview's `registry.json`. The preview is
 updated on each push and removed when the pull request closes. Fork pull requests get one too:

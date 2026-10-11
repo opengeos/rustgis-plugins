@@ -2,7 +2,7 @@
 """Turns a registry build into a pull request preview that RustGIS can install from.
 
     python scripts/preview.py dist preview                        # in CI, after build.py
-    python scripts/preview.py --site preview <pr> <sha> <out>     # the deploy job's site
+    python scripts/preview.py --site preview <pr> <sha> <out> [--published registry.json]
 
 The first form makes the preview's data from `dist/` (what `build.py` wrote): `registry.json`
 lists every plugin, as the real registry does, except that the packages this pull request built
@@ -10,19 +10,22 @@ lists every plugin, as the real registry does, except that the packages this pul
 packages are copied beside it, and `preview.json` names the plugins they hold.
 
 The second form is run by the deploy job on the base branch's code. It copies only the
-registry and the packages out of the (untrusted) preview data, checking each, and writes the
-landing page and headers itself, so a pull request can't publish pages of its own.
+registry and the packages out of the (untrusted) preview data, checking each package against its
+entry and its own plugin.json, lists every other plugin from the published registry, and writes
+the landing page and headers itself, so a pull request can't publish pages of its own.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import html
 import json
 import re
 import shutil
 import sys
+import zipfile
 from pathlib import Path
 
 PACKAGE_RE = re.compile(r"([a-z][a-z0-9-]{0,63})/\1-[0-9A-Za-z.+-]{1,64}\.rgplugin")
@@ -69,7 +72,27 @@ def make(dist: Path, out: Path) -> int:
     return 0
 
 
-def site(data: Path, pr: str, sha: str, out: Path) -> int:
+def read_manifest(package: bytes) -> dict | None:
+    """The plugin.json inside a package (at its root, or in its one top-level folder).
+
+    Args:
+        package: The package's bytes.
+
+    Returns:
+        The manifest, or None when the package has no readable one.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(package)) as z:
+            names = [n for n in z.namelist() if n == "plugin.json" or (n.count("/") == 1 and n.endswith("/plugin.json"))]
+            if len(names) != 1 or z.getinfo(names[0]).file_size > 1 << 20:
+                return None
+            m = json.loads(z.read(names[0]).decode("utf-8"))
+            return m if isinstance(m, dict) else None
+    except (zipfile.BadZipFile, ValueError, UnicodeDecodeError, KeyError):
+        return None
+
+
+def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None) -> int:
     """Builds the site the deploy job publishes, trusting nothing in `data`.
 
     Args:
@@ -77,6 +100,8 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         pr: The pull request number.
         sha: The commit the preview was built from.
         out: The folder to write the site to (replaced).
+        published: The published registry's entries by id; when given, they list every plugin
+            the pull request doesn't build, in place of the artifact's entries.
 
     Returns:
         The process exit code (1 when the data doesn't check out).
@@ -91,12 +116,17 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
     if not reg_path.is_file() or reg_path.is_symlink() or reg_path.stat().st_size > MAX_REGISTRY:
         print("preview: registry.json is missing or too large", file=sys.stderr)
         return 1
-    registry = json.loads(reg_path.read_text())
+    try:
+        registry = json.loads(reg_path.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        print("preview: registry.json isn't valid JSON", file=sys.stderr)
+        return 1
     plugins = registry.get("plugins") if isinstance(registry, dict) else None
     if not isinstance(plugins, list):
         print("preview: registry.json has no plugins list", file=sys.stderr)
         return 1
     packages = (data / "packages").resolve()
+    kept: list = []
     previewed = []
     copied: set[str] = set()
     total = 0
@@ -112,6 +142,7 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
             if not PACKAGE_RE.fullmatch(name):
                 print(f"preview: {pkg!r} isn't a published package's address", file=sys.stderr)
                 return 1
+            kept.append(e)
             continue
         if not pkg.startswith("packages/"):
             print(f"preview: {pkg!r} is neither in this preview nor published", file=sys.stderr)
@@ -127,6 +158,12 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         if hashlib.sha256(body).hexdigest() != e.get("sha256") or len(body) != e.get("size"):
             print(f"preview: {pkg!r} doesn't match its registry entry's sha256 and size", file=sys.stderr)
             return 1
+        # The entry says what the package's own plugin.json says, under the package's id.
+        manifest = read_manifest(body)
+        fields = (("id", None), ("name", None), ("version", None), ("permissions", []))
+        if manifest is None or name.split("/", 1)[0] != e.get("id") or any(e.get(k) != manifest.get(k, d) for k, d in fields):
+            print(f"preview: the entry for {pkg!r} doesn't describe the package it names", file=sys.stderr)
+            return 1
         previewed.append(e)
         if name in copied:
             continue
@@ -138,6 +175,14 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         dest = out / "packages" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(body)
+    if published is not None:
+        # Every plugin the pull request doesn't build is listed as it is published, whatever the
+        # artifact says about it (and however far main has moved since the pull request's base).
+        built = {e.get("id") for e in previewed}
+        registry = {"version": 1, "plugins": previewed + [e for i, e in published.items() if i not in built]}
+    else:
+        registry = {"version": 1, "plugins": previewed + kept}
+    registry["plugins"].sort(key=lambda e: str(e.get("name", "")).lower())
     (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
     # RustGIS in the browser fetches the registry and packages from another origin.
     (out / "_headers").write_text("/*\n  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n")
@@ -174,7 +219,7 @@ li{{margin:.6rem 0}} code{{background:#eef1f5;padding:0 .3rem;border-radius:.2re
 <h1>Plugin preview for <a href="{repo}/pull/{pr}">#{pr}</a></h1>
 <p>Built from <a href="{repo}/commit/{sha}"><code>{sha[:7]}</code></a>. This preview's registry lists every RustGIS plugin, with this pull request's
 plugins served from here:</p>
-<ul>{rows or "<li>No plugin packages changed in this pull request.</li>"}</ul>
+<ul>{rows}</ul>
 <p><a class="open" id="open" href="{WEB_APP}">Open in RustGIS</a></p>
 <p>It opens <a href="{WEB_APP}">web.rustgis.app</a>'s Plugin Manager on this preview's registry. Install a plugin there; RustGIS shows
 its permissions first. The registry is only used for that visit. On the desktop, set <b>Plugins › Plugin Manager › Settings › Plugin
@@ -197,11 +242,16 @@ def main() -> int:
     """
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--site", nargs=4, metavar=("DATA", "PR", "SHA", "OUT"), help="build the deploy job's site from preview data")
+    ap.add_argument("--published", metavar="REGISTRY", help="with --site: the published registry.json, which lists the other plugins")
     ap.add_argument("paths", nargs="*", metavar="DIST OUT", help="make preview data from a registry build")
     args = ap.parse_args()
     if args.site:
         data, pr, sha, out = args.site
-        return site(Path(data), pr, sha, Path(out))
+        published = None
+        if args.published:
+            entries = json.loads(Path(args.published).read_text(encoding="utf-8")).get("plugins", [])
+            published = {e.get("id"): e for e in entries if isinstance(e, dict)}
+        return site(Path(data), pr, sha, Path(out), published)
     if len(args.paths) != 2:
         ap.error("give DIST and OUT, or --site DATA PR SHA OUT")
     return make(Path(args.paths[0]), Path(args.paths[1]))
