@@ -3,6 +3,7 @@
 /site
 /docs/catalog.md
 /docs/catalog/
+/docs/registry.json
 .venv/
 __pycache__/
 .wrangler/

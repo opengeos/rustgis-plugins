@@ -17,6 +17,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import shutil
 from pathlib import Path
 from urllib.parse import quote
 
@@ -277,6 +278,9 @@ def main() -> None:
             raise SystemExit(f"refusing to write a page for {e.get('id')!r}")
         entries.append((e, manifests.get(e["id"], {})))
     (DOCS / "catalog.md").write_text(render_catalog(len(entries)))
+    # The catalog reads registry.json from the site's root; a copy in docs/ lets a local
+    # `zensical serve` show it too (deploys put the same file there).
+    shutil.copyfile(DIST / "registry.json", DOCS / "registry.json")
     pages = DOCS / "catalog"
     pages.mkdir(exist_ok=True)
     for old in pages.glob("*.md"):

@@ -169,7 +169,7 @@
             if (selected.has(c)) selected.delete(c);
             else selected.add(c);
             b.setAttribute("aria-pressed", String(selected.has(c)));
-            apply();
+            apply(true);
           });
           boxes.append(b);
         }
@@ -194,7 +194,9 @@
           while (more.isConnected && rendered < shown.length && more.getBoundingClientRect().top < innerHeight + 800) fill();
         }
 
-        function apply() {
+        function apply(byUser) {
+          // A new filter starts at the top of the list, not wherever the old one was scrolled.
+          if (byUser && filters.getBoundingClientRect().top < 0) filters.scrollIntoView({ block: "start" });
           const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
           shown = [];
           plugins.forEach((p, i) => {
@@ -235,7 +237,7 @@
         for (const ev of ["input", "search"]) {
           search.addEventListener(ev, () => {
             clearTimeout(typing);
-            typing = setTimeout(apply, 120);
+            typing = setTimeout(() => apply(true), 120);
           });
         }
         filters.hidden = false;
