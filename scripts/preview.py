@@ -72,6 +72,38 @@ def make(dist: Path, out: Path) -> int:
     return 0
 
 
+def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
+    """The registry entry build.py writes for a package with this manifest.
+
+    Args:
+        manifest: The package's plugin.json.
+        e: The entry being checked (its categories, hash and size are taken from it; the hash
+            and size are checked against the package separately).
+        pkg: The package's address in the registry.
+
+    Returns:
+        The entry.
+    """
+    return {
+        "id": manifest.get("id"),
+        "name": manifest.get("name"),
+        "version": manifest.get("version"),
+        "description": manifest.get("description", ""),
+        "author": manifest.get("author", ""),
+        "homepage": manifest.get("homepage", ""),
+        "license": manifest.get("license", ""),
+        "categories": e.get("categories", []),
+        "package": pkg,
+        "sha256": e.get("sha256"),
+        "size": e.get("size"),
+        "minRustgisVersion": manifest.get("minRustgisVersion", ""),
+        "permissions": manifest.get("permissions", []),
+        "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", []) if isinstance(c, dict)],
+        "tools": [t.get("name", "") for t in manifest.get("tools", []) if isinstance(t, dict)],
+        "tab": (manifest.get("tab") or {}).get("label", "") if isinstance(manifest.get("tab") or {}, dict) else "",
+    }
+
+
 def read_manifest(package: bytes) -> dict | None:
     """The plugin.json inside a package (at its root, or in its one top-level folder).
 
@@ -84,9 +116,14 @@ def read_manifest(package: bytes) -> dict | None:
     try:
         with zipfile.ZipFile(io.BytesIO(package)) as z:
             names = [n for n in z.namelist() if n == "plugin.json" or (n.count("/") == 1 and n.endswith("/plugin.json"))]
-            if len(names) != 1 or z.getinfo(names[0]).file_size > 1 << 20:
+            if len(names) != 1:
                 return None
-            m = json.loads(z.read(names[0]).decode("utf-8"))
+            # The header's size is the package's say-so: read at most a megabyte, whatever it says.
+            with z.open(names[0]) as f:
+                raw = f.read((1 << 20) + 1)
+            if len(raw) > 1 << 20:
+                return None
+            m = json.loads(raw.decode("utf-8"))
             return m if isinstance(m, dict) else None
     except (zipfile.BadZipFile, ValueError, UnicodeDecodeError, KeyError):
         return None
@@ -158,10 +195,12 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
         if hashlib.sha256(body).hexdigest() != e.get("sha256") or len(body) != e.get("size"):
             print(f"preview: {pkg!r} doesn't match its registry entry's sha256 and size", file=sys.stderr)
             return 1
-        # The entry says what the package's own plugin.json says, under the package's id.
+        # The entry is what build.py makes from the package's own plugin.json, under the package's
+        # id: only its categories come from elsewhere.
         manifest = read_manifest(body)
-        fields = (("id", None), ("name", None), ("version", None), ("permissions", []))
-        if manifest is None or name.split("/", 1)[0] != e.get("id") or any(e.get(k) != manifest.get(k, d) for k, d in fields):
+        cats = e.get("categories", [])
+        good_cats = isinstance(cats, list) and len(cats) <= 4 and all(isinstance(c, str) and len(c) <= 32 for c in cats)
+        if manifest is None or name.split("/", 1)[0] != e.get("id") or not good_cats or e != entry_for(manifest, e, pkg):
             print(f"preview: the entry for {pkg!r} doesn't describe the package it names", file=sys.stderr)
             return 1
         # Each plugin once, however often the registry lists it.
