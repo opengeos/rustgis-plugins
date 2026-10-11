@@ -122,7 +122,8 @@ jobs:
   deploy:
     name: Publish the preview
     needs: resolve
-    if: needs.resolve.outputs.plugins != ''
+    # Only pull requests that build a plugin package get a preview.
+    if: needs.resolve.outputs.plugins != '' && needs.resolve.outputs.plugins != '0'
     runs-on: ubuntu-latest
     concurrency:
       group: plugin-preview-pr-${{ needs.resolve.outputs.number }}
@@ -254,7 +255,11 @@ jobs:
             fi
           done
           for id in $ids; do
-            curl -sf -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null && echo "deleted $id"
+            if curl -sf -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null; then
+              echo "deleted $id"
+            else
+              echo "::warning::Could not delete deployment $id of $BRANCH."
+            fi
           done
 
       - name: Mark the comment

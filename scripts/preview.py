@@ -25,8 +25,10 @@ import shutil
 import sys
 from pathlib import Path
 
-PACKAGE_RE = re.compile(r"^([a-z][a-z0-9-]{0,63})/\1-[0-9A-Za-z.+-]{1,64}\.rgplugin$")
-MAX_PACKAGE = 64 * 1024 * 1024
+PACKAGE_RE = re.compile(r"([a-z][a-z0-9-]{0,63})/\1-[0-9A-Za-z.+-]{1,64}\.rgplugin")
+# Cloudflare Pages takes files of at most 25 MiB; the whole preview is kept small too.
+MAX_PACKAGE = 25 * 1024 * 1024
+MAX_SITE = 200 * 1024 * 1024
 MAX_REGISTRY = 32 * 1024 * 1024
 WEB_APP = "https://web.rustgis.app/"
 PUBLISHED = "https://packages.rustgis.app/"
@@ -49,7 +51,7 @@ def make(dist: Path, out: Path) -> int:
     (out / "packages").mkdir(parents=True)
     previewed = []
     for name in new:
-        if not PACKAGE_RE.match(name):
+        if not PACKAGE_RE.fullmatch(name):
             print(f"preview: skipping unexpected package name {name!r}", file=sys.stderr)
             continue
         dest = out / "packages" / name
@@ -96,6 +98,8 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         return 1
     packages = (data / "packages").resolve()
     previewed = []
+    copied: set[str] = set()
+    total = 0
     for e in plugins:
         pkg = e.get("package", "") if isinstance(e, dict) else ""
         if not isinstance(pkg, str):
@@ -105,7 +109,7 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         # can't point an entry anywhere else.
         if pkg.startswith(PUBLISHED):
             name = pkg.removeprefix(PUBLISHED)
-            if not PACKAGE_RE.match(name):
+            if not PACKAGE_RE.fullmatch(name):
                 print(f"preview: {pkg!r} isn't a published package's address", file=sys.stderr)
                 return 1
             continue
@@ -116,17 +120,24 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
         src = data / "packages" / name
         # Inside the preview's packages, whatever links the path goes through.
         inside = src.resolve().is_relative_to(packages)
-        if not PACKAGE_RE.match(name) or not inside or not src.is_file() or src.is_symlink() or src.stat().st_size > MAX_PACKAGE:
+        if not PACKAGE_RE.fullmatch(name) or not inside or not src.is_file() or src.is_symlink() or src.stat().st_size > MAX_PACKAGE:
             print(f"preview: {pkg!r} is not a package this preview holds", file=sys.stderr)
             return 1
         body = src.read_bytes()
         if hashlib.sha256(body).hexdigest() != e.get("sha256") or len(body) != e.get("size"):
             print(f"preview: {pkg!r} doesn't match its registry entry's sha256 and size", file=sys.stderr)
             return 1
+        previewed.append(e)
+        if name in copied:
+            continue
+        total += len(body)
+        if total > MAX_SITE:
+            print(f"preview: the packages add up to more than {MAX_SITE >> 20} MiB", file=sys.stderr)
+            return 1
+        copied.add(name)
         dest = out / "packages" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(body)
-        previewed.append(e)
     (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
     # RustGIS in the browser fetches the registry and packages from another origin.
     (out / "_headers").write_text("/*\n  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n")
