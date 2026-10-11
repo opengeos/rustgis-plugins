@@ -46,7 +46,7 @@ rustgis_plugin::export!(handle);
 
 /// The map's tile layers, top first: `[{"index", "name", "id", "overlay", …}]`.
 fn tile_layers() -> Result<Vec<Value>, String> {
-    Ok(host::run("map.tiles", json!({}))?.as_array().cloned().unwrap_or_default())
+    host::run("map.tiles", json!({}))?.as_array().cloned().ok_or_else(|| "map.tiles returned an unexpected result".to_string())
 }
 
 /// The parameters of `map.addTiles` for a catalog entry.

@@ -63,7 +63,7 @@ B = [
     ("openseamap", "OpenSeaMap", "Sea marks: buoys, lights and harbours.", "raster", "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", "Map data: © OpenSeaMap contributors", 18, True, "", "point_layer"),
     ("waymarked-hiking", "Hiking Trails", "Waymarked hiking routes from OpenStreetMap.", "raster", "https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png", "Map data: " + OSM + " | Map style: © waymarkedtrails.org (CC-BY-SA)", 18, True, "", "line_layer"),
     ("waymarked-cycling", "Cycling Routes", "Waymarked cycling routes from OpenStreetMap.", "raster", "https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png", "Map data: " + OSM + " | Map style: © waymarkedtrails.org (CC-BY-SA)", 18, True, "", "line_layer"),
-    ("usgs-hydro", "USGS Hydrography", "The National Map's rivers, streams and water bodies (United States).", "raster", USGS_T.format("USGSHydroCached"), USGS, 16, False, "", "basemap"),
+    ("usgs-hydro", "USGS Hydrography", "The National Map's rivers, streams and water bodies (United States).", "raster", USGS_T.format("USGSHydroCached"), USGS, 16, True, "", "line_layer"),
 ]
 EXTRA = [
     {"id": "clear", "label": "Clear\nBasemaps", "help": "Remove the web basemaps and go back to the built-in one. Overlays stay.", "icon": "delete"},
@@ -86,7 +86,7 @@ tab = {"label": "Basemaps", "groups": [
     ]},
     {"label": "Imagery & Terrain", "items": [
         menu("Imagery", "raster_layer", "Satellite and aerial imagery.", ["esri-imagery", "usgs-imagery", "usgs-imagery-topo", "nasa-blue-marble", "nasa-night-lights"]),
-        menu("Terrain", "relief", "Topographic maps, relief and hillshade.", ["opentopomap", "usgs-topo", "usgs-shaded-relief", "esri-terrain", "esri-shaded-relief", "esri-physical", "esri-hillshade", "usgs-hydro"]),
+        menu("Terrain", "relief", "Topographic maps, relief and hillshade.", ["opentopomap", "usgs-topo", "usgs-shaded-relief", "esri-terrain", "esri-shaded-relief", "esri-physical", "esri-hillshade"]),
     ]},
     {"label": "Vector", "items": [
         menu("OpenFreeMap", "web_map", "OpenFreeMap's vector maps of the world, drawn from vector tiles.", [i for i in ids if i.startswith("openfreemap-")]),
@@ -94,7 +94,7 @@ tab = {"label": "Basemaps", "groups": [
     ]},
     {"label": "Overlays", "items": [
         menu("Labels", "label", "Place names over any basemap. Choose one again to remove it.", ["esri-places", "esri-gray-reference", "esri-ocean-reference"]),
-        menu("Lines", "line_layer", "Roads, railways, trails and waterways over any basemap. Choose one again to remove it.", ["esri-transportation", "openrailwaymap", "waymarked-hiking", "waymarked-cycling", "openseamap"]),
+        menu("Lines", "line_layer", "Roads, railways, trails and waterways over any basemap. Choose one again to remove it.", ["esri-transportation", "openrailwaymap", "waymarked-hiking", "waymarked-cycling", "usgs-hydro", "openseamap"]),
     ]},
     {"label": "Manage", "items": ["clear", "clear-overlays", "current"]},
 ]}

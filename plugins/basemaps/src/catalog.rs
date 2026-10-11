@@ -431,7 +431,7 @@ pub const CATALOG: &[Basemap] = &[
         url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/tile/{z}/{y}/{x}",
         attribution: "USGS The National Map",
         max_zoom: 16,
-        overlay: false,
+        overlay: true,
         subdomains: "",
     },
 ];

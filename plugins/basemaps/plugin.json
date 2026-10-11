@@ -303,9 +303,8 @@
     {
       "id": "usgs-hydro",
       "label": "USGS Hydrography",
-      "help": "The National Map's rivers, streams and water bodies (United States).",
-      "icon": "basemap",
-      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+      "help": "The National Map's rivers, streams and water bodies (United States). An overlay: choose it again to remove it.",
+      "icon": "line_layer"
     },
     {
       "id": "clear",
@@ -395,8 +394,7 @@
               "esri-terrain",
               "esri-shaded-relief",
               "esri-physical",
-              "esri-hillshade",
-              "usgs-hydro"
+              "esri-hillshade"
             ]
           }
         ]
@@ -453,6 +451,7 @@
               "openrailwaymap",
               "waymarked-hiking",
               "waymarked-cycling",
+              "usgs-hydro",
               "openseamap"
             ]
           }

@@ -148,8 +148,9 @@ Inside a request, `host::call(op, params)` sends one of these to RustGIS:
 | `host.view` | `{center: [lon, lat], scale, projection}` |
 | `host.notify` `{text, error?}` | shows a message in the status bar |
 | `host.addLayer` `{name, geojson}` | adds a layer (`edit`) |
-| `map.addTiles` `{url, kind?, name?, attribution?, maxZoom?, overlay?, replace?}` | adds a web tile layer: raster tiles, vector tiles or a MapLibre style (`edit` and `network`) |
-| `map.tiles`, `map.removeTiles`, `map.setTiles` | lists, removes and changes the map's tile layers |
+| `map.addTiles` `{url, kind?, name?, attribution?, minZoom?, maxZoom?, tileSize?, tms?, subdomains?, opacity?, overlay?, replace?, id?}` | adds a web tile layer: raster tiles, vector tiles or a MapLibre style (`edit` and `network`); `id` marks it so the plugin can find it again in `map.tiles` |
+| `map.tiles` | the map's tile layers, top first: `[{index, name, id, kind, url, visible, opacity, overlay, attribution, minZoom, maxZoom}]` |
+| `map.removeTiles` `{index? \| name? \| id?}`, `map.setTiles` `{index? \| name?, visible?, opacity?, move?, rename?}` | removes (every one when none is named) and changes tile layers (`edit`) |
 | any command id (`layer.zoomTo`, `select.byAttributes`, `layer.symbology`…) | what the command returns, within the plugin's permissions |
 
 `rustgis-cli commands` lists every command id and its parameters.

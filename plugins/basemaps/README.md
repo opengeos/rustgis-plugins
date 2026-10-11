@@ -23,7 +23,7 @@ For a service that isn't listed (or one that needs a key), use **Map › Basemap
 
 - **Popular**: OpenStreetMap, Esri World Imagery, OpenFreeMap Positron, OpenFreeMap Liberty
 - **Streets**: **OpenStreetMap ▾** (6), **Esri ▾** (6)
-- **Imagery & Terrain**: **Imagery ▾** (5), **Terrain ▾** (8)
+- **Imagery & Terrain**: **Imagery ▾** (5), **Terrain ▾** (7)
 - **Vector**: **OpenFreeMap ▾** (6), **VersaTiles ▾** (5)
 - **Overlays**: **Labels ▾** (3), **Lines ▾** (6)
 - **Manage**: Clear Basemaps, Clear Overlays, Current
