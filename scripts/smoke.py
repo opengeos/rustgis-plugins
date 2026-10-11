@@ -54,9 +54,18 @@ def main() -> int:
                 if not args.all:
                     continue
                 package = Path(downloads) / file_name
-                req = urllib.request.Request(e["package"], headers={"User-Agent": "rustgis-plugins-smoke"})
-                with urllib.request.urlopen(req, timeout=120) as r:
-                    package.write_bytes(r.read())
+                if not str(e["package"]).startswith("https://"):
+                    print(f"error: {e['id']}: package URL isn't https: {e['package']}")
+                    failures += 1
+                    continue
+                try:
+                    req = urllib.request.Request(e["package"], headers={"User-Agent": "rustgis-plugins-smoke"})
+                    with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310 - https only, checked above
+                        package.write_bytes(r.read())
+                except Exception as err:  # noqa: BLE001 - one bad download mustn't stop the run
+                    print(f"error: {e['id']}: can't download {e['package']}: {err}")
+                    failures += 1
+                    continue
             print(f"== {e['id']} {e['version']}")
             listed = run(args.cli, package, ["info.commands"], plugins_dir)
             if listed.returncode != 0:

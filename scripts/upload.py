@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -22,6 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 BUCKET = "rustgis-plugins"
 PACKAGES_URL = "https://packages.rustgis.app"
+# An exact version: it runs with a token that can write to the bucket.
+WRANGLER = "wrangler@4.145.0"
 
 
 def fetch(url: str) -> bytes | None:
@@ -33,7 +36,8 @@ def fetch(url: str) -> bytes | None:
     Returns:
         Its bytes, or None when the bucket doesn't have it.
     """
-    req = urllib.request.Request(f"{url}?check", headers={"User-Agent": "rustgis-plugins-upload", "Cache-Control": "no-cache"})
+    # A fresh query string each time, so a cached answer (a 404 before the upload) isn't reused.
+    req = urllib.request.Request(f"{url}?check={time.time_ns()}", headers={"User-Agent": "rustgis-plugins-upload", "Cache-Control": "no-cache"})
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             return r.read()
@@ -62,7 +66,7 @@ def main() -> int:
             continue
         subprocess.run(
             [
-                "npx", "--yes", "wrangler@4", "r2", "object", "put", f"{BUCKET}/{name}", "--file", str(path), "--remote",
+                "npx", "--yes", WRANGLER, "r2", "object", "put", f"{BUCKET}/{name}", "--file", str(path), "--remote",
                 "--content-type", "application/zip", "--cache-control", "public, max-age=31536000, immutable",
             ],
             check=True,

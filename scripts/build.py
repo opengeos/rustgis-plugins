@@ -40,6 +40,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 import urllib.error
 import urllib.request
@@ -271,8 +272,14 @@ def read_package(data: bytes, where: str) -> tuple[dict, bytes] | None:
         return None
 
 
+def package_name(folder: Path) -> str:
+    """The cargo package name of an in-repository plugin (for `cargo build -p`)."""
+    return tomllib.loads((folder / "Cargo.toml").read_text())["package"]["name"]
+
+
 def crate_name(folder: Path) -> str:
-    return tomllib.loads((folder / "Cargo.toml").read_text())["package"]["name"].replace("-", "_")
+    """The plugin's crate name, which names its .wasm file."""
+    return package_name(folder).replace("-", "_")
 
 
 def download(url: str) -> bytes:
@@ -306,28 +313,68 @@ def tree_hash(folder: Path) -> str:
     return h.hexdigest()
 
 
+MAX_INDEX = 256 * 1024 * 1024
+
+
 def load_index(source: str | None) -> dict:
     """Reads the previous deploy's package index.
+
+    Only a missing index (404: the first deploy) means "no index". Any other failure (network,
+    timeout, a truncated or malformed file) is a problem, because without the index the check
+    that in-repository plugins bumped their version can't run.
 
     Args:
         source: A URL or a file path, or None for no index.
 
     Returns:
-        The index's plugins by id (empty when it can't be read).
+        The index's plugins by id (empty when there is none or it can't be read).
     """
     if not source:
         return {}
     try:
         if source.startswith("https://"):
-            req = urllib.request.Request(source, headers={"User-Agent": "rustgis-plugins-registry", "Cache-Control": "no-cache"})
+            req = urllib.request.Request(f"{source}?{time.time_ns()}", headers={"User-Agent": "rustgis-plugins-registry", "Cache-Control": "no-cache"})
             with urllib.request.urlopen(req, timeout=60) as r:
-                data = json.loads(r.read(64 * 1024 * 1024))
+                raw = r.read(MAX_INDEX + 1)
         else:
-            data = json.loads(Path(source).read_text())
-    except Exception as e:  # noqa: BLE001 - without an index everything is checked against the bucket
-        print(f"note: no package index ({e}); reusing packages from the bucket where they exist", file=sys.stderr)
+            raw = Path(source).read_bytes()
+        if len(raw) > MAX_INDEX:
+            raise ValueError(f"larger than {MAX_INDEX // (1024 * 1024)} MB")
+        data = json.loads(raw)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("note: no package index yet (first deploy); reusing packages already in the bucket", file=sys.stderr)
+            return {}
+        problem(f"the package index {source} couldn't be read ({e}); rerun once it is reachable")
         return {}
-    return {p["id"]: p for p in data.get("plugins", []) if isinstance(p, dict) and "id" in p}
+    except Exception as e:  # noqa: BLE001 - any other failure stops a checked build
+        problem(f"the package index {source} couldn't be read ({e}); rerun once it is reachable")
+        return {}
+    return {p["id"]: p for p in data.get("plugins", []) if valid_cached(p)}
+
+
+def valid_cached(p: object) -> bool:
+    """Whether a package index entry has what reusing it needs; anything else is rebuilt.
+
+    Args:
+        p: An entry from the index.
+
+    Returns:
+        True when it can be reused.
+    """
+    if not isinstance(p, dict):
+        return False
+    m = p.get("manifest")
+    return (
+        isinstance(p.get("id"), str)
+        and isinstance(p.get("version"), str)
+        and SHA_RE.match(str(p.get("sha256", ""))) is not None
+        and isinstance(p.get("size"), int)
+        and isinstance(p.get("origin"), dict)
+        and isinstance(m, dict)
+        and m.get("id") == p["id"]
+        and m.get("version") == p["version"]
+    )
 
 
 def published(url: str) -> bytes | None:
@@ -472,7 +519,7 @@ def main() -> int:
             problem(f"{where}: needs a 'path' (a plugin in this repository) or a 'source' (a package hosted elsewhere)")
 
     # Build only the plugins that need it.
-    to_build = [crate_name(p[3]).replace("_", "-") for p in plans if p[2] == "build"]
+    to_build = [package_name(p[3]) for p in plans if p[2] == "build"]
     if to_build and not args.no_cargo:
         cmd = ["cargo", "build", "--release", "--target", "wasm32-unknown-unknown"]
         for c in to_build:
@@ -483,6 +530,9 @@ def main() -> int:
     for reg, where, how, what, origin in plans:
         if how == "reuse":
             manifest, digest, size, fresh = what["manifest"], what["sha256"], what["size"], None
+            # Rules added since it was published apply to it too.
+            check_manifest(manifest, where)
+            check_tab(manifest, where)
         else:
             if how == "build":
                 wasm_path = TARGET / f"{crate_name(what)}.wasm"
@@ -516,6 +566,13 @@ def main() -> int:
             if existing is not None and how == "download" and sha256(existing) != sha256(data):
                 problem(f"{where}: {manifest['id']} {manifest['version']} is already published with different contents; bump the version")
                 continue
+            if existing is not None and how == "build":
+                # A rebuild needn't be byte-identical, but what it declares must match what is
+                # published under this version: otherwise the version wasn't bumped.
+                old = read_package(existing, f"{url} (published)")
+                if old is None or old[0] != manifest:
+                    problem(f"{where}: plugin.json differs from the published {manifest['id']} {manifest['version']}; bump the version")
+                    continue
             data = existing if existing is not None else data
             digest, size, fresh = sha256(data), len(data), data if existing is None else None
         name = f"{manifest['id']}-{manifest['version']}.rgplugin"
