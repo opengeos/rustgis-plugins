@@ -7,7 +7,7 @@
 The first form makes the preview's data from `dist/` (what `build.py` wrote): `registry.json`
 lists every plugin, as the real registry does, except that the packages this pull request built
 (`dist/new.txt`) are served from the preview itself, by a path relative to the registry. Those
-packages are copied beside it, and `preview.json` names the plugins they hold.
+packages are copied beside it.
 
 The second form is run by the deploy job on the base branch's code. It copies only the
 registry and the packages out of the (untrusted) preview data, checking each package against its
@@ -38,7 +38,7 @@ PUBLISHED = "https://packages.rustgis.app/"
 
 
 def make(dist: Path, out: Path) -> int:
-    """Writes the preview's data (registry, packages, preview.json) from a registry build.
+    """Writes the preview's data (registry and packages) from a registry build.
 
     Args:
         dist: The folder `build.py` wrote.
@@ -67,7 +67,6 @@ def make(dist: Path, out: Path) -> int:
                 e["package"] = f"packages/{name}"
                 previewed.append({"id": pid, "name": e.get("name", pid), "version": e.get("version", "")})
     (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
-    (out / "preview.json").write_text(json.dumps({"plugins": previewed}, ensure_ascii=False) + "\n")
     print(f"preview: {len(previewed)} plugin(s) from this pull request: {', '.join(p['id'] for p in previewed) or 'none'}")
     return 0
 
@@ -171,7 +170,6 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
     packages = (data / "packages").resolve()
     kept: list = []
     previewed = []
-    copied: set[str] = set()
     total = 0
     for e in plugins:
         pkg = e.get("package", "") if isinstance(e, dict) else ""
@@ -213,13 +211,10 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
         if any(p.get("id") == e.get("id") for p in previewed):
             continue
         previewed.append(e)
-        if name in copied:
-            continue
         total += len(body)
         if total > MAX_SITE:
             print(f"preview: the packages add up to more than {MAX_SITE >> 20} MiB", file=sys.stderr)
             return 1
-        copied.add(name)
         dest = out / "packages" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(body)

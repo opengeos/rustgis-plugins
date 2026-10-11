@@ -34,18 +34,20 @@ on:
   pull_request_target:
     types: [closed]
 
+# Least privilege: only the jobs that write the comment get pull-requests: write.
 permissions:
   contents: read
-  pull-requests: write
   actions: read
+  pull-requests: read
 
 env:
   PROJECT: rustgis-plugins-preview
 
-# Publishing and removing a pull request's preview share one concurrency group per pull request
-# (plugin-preview-pr-<N>) and never cancel each other, so they run one after the other: a
-# removal can't be overtaken by a publish that was already under way. Only `resolve` can tell
-# which pull request a CI run belongs to, so publishing is a job of its own.
+# Publishing is serialized per pull request (plugin-preview-pr-<N>); removal has a group of its
+# own, so a later publish can never displace a queued removal. A publish that overlaps a removal
+# checks the pull request again once it has published and, if it closed meanwhile, deletes what
+# it published. Only `resolve` can tell which pull request a CI run belongs to, so publishing is
+# a job of its own.
 jobs:
   resolve:
     name: Build the preview site
@@ -100,7 +102,6 @@ jobs:
           read -r head state < <(gh api "repos/${{ github.repository }}/pulls/$pr" --jq '"\(.head.sha) \(.state)"')
           if [ "$head" != "$RUN_SHA" ] || [ "$state" != open ]; then
             echo "::notice::#$pr has moved on from $RUN_SHA (or is closed); a later run publishes it."
-            echo "stale=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "number=$pr" >> "$GITHUB_OUTPUT"
@@ -133,12 +134,20 @@ jobs:
     # Only pull requests that build a plugin package get a preview.
     if: needs.resolve.outputs.plugins != '' && needs.resolve.outputs.plugins != '0'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     concurrency:
       group: plugin-preview-pr-${{ needs.resolve.outputs.number }}
       cancel-in-progress: false
     env:
       HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
     steps:
+      # The base branch, for scripts/preview_delete.sh.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Say why there is no preview
         if: env.HAS_TOKEN != 'true'
         run: echo "::notice::CLOUDFLARE_PAGES_TOKEN is not set, so the preview isn't published."
@@ -187,8 +196,29 @@ jobs:
             --commit-hash=${{ github.event.workflow_run.head_sha }}
             --commit-dirty=true
 
-      - name: Comment the preview on the pull request
+      # A removal may have run while this published: if the pull request is closed now, take
+      # down what was just published.
+      - name: Check the pull request is still open after publishing
+        id: after
         if: steps.deploy.outputs.deployment-url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ needs.resolve.outputs.number }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: pr-${{ needs.resolve.outputs.number }}
+        run: |
+          set -euo pipefail
+          state=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq .state)
+          if [ "$state" = open ]; then
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::#$PR closed while the preview was published; removing it."
+            scripts/preview_delete.sh
+          fi
+
+      - name: Comment the preview on the pull request
+        if: steps.after.outputs.open == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR: ${{ needs.resolve.outputs.number }}
@@ -232,44 +262,29 @@ jobs:
     name: Remove the preview
     if: github.event_name == 'pull_request_target' && github.repository == 'opengeos/rustgis-plugins'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     concurrency:
-      group: plugin-preview-pr-${{ github.event.pull_request.number }}
+      group: plugin-preview-remove-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     env:
       HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
     steps:
-      # Deletes the pull request's deployments. Nothing from the pull request is checked out.
+      # The base branch (pull_request_target never checks out the pull request), for
+      # scripts/preview_delete.sh.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Deletes the pull request's deployments.
       - name: Delete the deployments
         if: env.HAS_TOKEN == 'true'
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
           ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: pr-${{ github.event.pull_request.number }}
-        run: |
-          set -euo pipefail
-          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/$PROJECT/deployments"
-          ids=""
-          page=1
-          while :; do
-            if ! got=$(curl -sf --retry 3 -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=25&page=$page&env=preview"); then
-              echo "::warning::Could not list $BRANCH's deployments (page $page); some may remain."
-              break
-            fi
-            [ "$(jq '.result | length' <<< "$got")" -gt 0 ] || break
-            ids+=" $(jq -r --arg b "$BRANCH" '.result[] | select(.deployment_trigger.metadata.branch == $b) | .id' <<< "$got")"
-            page=$((page + 1))
-            if [ "$page" -gt 400 ]; then
-              echo "::warning::Stopped after 10,000 deployments; some of $BRANCH's may remain."
-              break
-            fi
-          done
-          for id in $ids; do
-            if curl -sf --retry 3 -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null; then
-              echo "deleted $id"
-            else
-              echo "::warning::Could not delete deployment $id of $BRANCH."
-            fi
-          done
+        run: scripts/preview_delete.sh
 
       - name: Mark the comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
