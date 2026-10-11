@@ -48,6 +48,11 @@
     return a;
   }
 
+  // A plugin's page, relative to the catalog page.
+  function page(id) {
+    return new URL(`${encodeURIComponent(id)}/`, location.href).href;
+  }
+
   function size(n) {
     return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
   }
@@ -62,15 +67,13 @@
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", PUZZLE);
     svg.append(path);
-    const name = link(p.name || p.id, `/catalog/${encodeURIComponent(p.id)}/`);
-    if (name) {
-      const strong = el("strong");
-      strong.append(name);
-      title.append(svg, strong);
-    }
+    // Plugin pages are beside the catalog page (catalog/<id>/), wherever the site is served.
+    const strong = el("strong");
+    strong.append(link(p.name || p.id, page(p.id)) || (p.name || p.id));
+    title.append(svg, strong);
     li.append(title, el("hr"));
     if (p.description) li.append(el("p", null, p.description));
-    const meta = [p.version];
+    const meta = p.version ? [p.version] : [];
     if (p.author) meta.push(`by ${p.author}`);
     if (p.tab) meta.push(`its own ${p.tab} tab`);
     const nc = (p.commands || []).length;
@@ -98,7 +101,7 @@
     if (tags.childNodes.length) li.append(tags);
     const links = el("p", "plugin-card-links");
     const parts = [
-      link("Details", `/catalog/${encodeURIComponent(p.id)}/`),
+      link("Details", page(p.id)),
       link(`Download (${size(p.size || 0)})`, p.package),
       link("Homepage", p.homepage, true),
     ].filter(Boolean);
@@ -121,7 +124,8 @@
     const boxes = filters.querySelector(".plugin-categories");
     const count = filters.querySelector(".plugin-count");
 
-    registry ??= fetch(catalog.dataset.registry || "/registry.json", { cache: "no-cache" })
+    // registry.json is at the site's root, given relative to this page.
+    registry ??= fetch(new URL(catalog.dataset.registry || "../registry.json", location.href), { cache: "no-cache" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .catch((e) => {
         registry = undefined;
@@ -155,13 +159,19 @@
         let shown = []; // indexes of the plugins that match
         let rendered = 0;
 
-        // The next batch of cards, while the end of the list is in view.
+        // The next batch of cards.
         function fill() {
           const end = Math.min(rendered + BATCH, shown.length);
           const frag = document.createDocumentFragment();
           for (; rendered < end; rendered += 1) frag.append(card(plugins[shown[rendered]]));
           list.append(frag);
           more.textContent = rendered < shown.length ? "Loading more…" : "";
+        }
+
+        // Batches until the end of the list is out of reach (a tall or zoomed-out window can
+        // show more than one batch, and the observer only calls back when that changes).
+        function topUp() {
+          while (rendered < shown.length && more.getBoundingClientRect().top < innerHeight + 800) fill();
         }
 
         function apply() {
@@ -181,13 +191,14 @@
           rendered = 0;
           if (!shown.length) list.append(el("li", "plugin-none", "No plugins match."));
           fill();
+          topUp();
         }
 
         // Load more when the marker after the list comes near the viewport.
         if ("IntersectionObserver" in window) {
           new IntersectionObserver(
             (seen) => {
-              if (seen.some((e) => e.isIntersecting) && rendered < shown.length) fill();
+              if (seen.some((e) => e.isIntersecting)) topUp();
             },
             { rootMargin: "800px 0px" },
           ).observe(more);

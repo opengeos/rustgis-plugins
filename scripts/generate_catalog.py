@@ -145,10 +145,10 @@ def render_catalog(count: int) -> str:
         '  <div class="plugin-categories" role="group" aria-label="Filter by category"></div>\n'
         '  <p class="plugin-count" aria-live="polite"></p>\n'
         "</div>\n"
-        '<div class="grid cards plugin-catalog" data-registry="/registry.json"><ul></ul></div>\n'
+        '<div class="grid cards plugin-catalog" data-registry="../registry.json"><ul></ul></div>\n'
         '<div class="plugin-more" aria-hidden="true"></div>\n'
         "<noscript><p>The catalog needs JavaScript. The plugin list is also available as "
-        '<a href="/registry.json">registry.json</a>.</p></noscript>\n'
+        '<a href="../registry.json">registry.json</a>.</p></noscript>\n'
     )
 
 
