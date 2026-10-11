@@ -120,115 +120,36 @@ def size(n: int) -> str:
     return f"{n / 1_048_576:.1f} MB" if n >= 1_048_576 else f"{max(1, round(n / 1024))} KB"
 
 
-def what_it_adds(manifest: dict) -> str:
-    """Summarizes what a plugin adds, for its card.
+def render_catalog(count: int) -> str:
+    """Renders docs/catalog.md: a shell that catalog.js fills from registry.json, so the page stays
+    small however many plugins there are (cards load in batches as you scroll).
 
     Args:
-        manifest: The plugin's manifest.
-
-    Returns:
-        For example "3 commands · 1 tool".
-    """
-    parts = []
-    if (manifest.get("tab") or {}).get("label"):
-        parts.append(f"its own **{text(manifest['tab']['label'])}** tab")
-    for key, one, many in (("commands", "command", "commands"), ("tools", "tool", "tools")):
-        n = len(manifest.get(key) or [])
-        if n:
-            parts.append(f"{n} {one if n == 1 else many}")
-    return " · ".join(parts)
-
-
-def render_card(entry: dict, manifest: dict) -> str:
-    """Renders one plugin as a grid card.
-
-    Args:
-        entry: A registry.json entry.
-        manifest: Its manifest.
-
-    Returns:
-        The Markdown list item for the card.
-    """
-    name = text(entry.get("name", entry["id"]))
-    meta = [f"**{text(entry.get('version', ''))}**"]
-    if entry.get("author"):
-        meta.append(f"by {text(entry['author'])}")
-    adds = what_it_adds(manifest)
-    if adds:
-        meta.append(adds)
-    perms = entry.get("permissions") or []
-    perm_line = " ".join(
-        f':material-shield-alert-outline:{{ title="{html.escape(PERMISSIONS[p][1])}" }} {PERMISSIONS[p][0]}' for p in perms if p in PERMISSIONS
-    ) or ':material-shield-check-outline:{ title="Only reads the map." } Reads the map only'
-    lines = [
-        f"-   :material-puzzle:{{ .lg .middle }} [__{name}__](catalog/{entry['id']}.md)",
-        "",
-        "    ---",
-        "",
-    ]
-    if entry.get("description"):
-        lines += [f"    {text(entry['description'])}", ""]
-    lines += [f'    <span class="plugin-card-meta">{" · ".join(meta)}</span>', ""]
-    lines += [f'    <span class="plugin-card-perms">{perm_line}</span>', ""]
-    if tags(entry.get("categories") or []):
-        lines += [f"    {tags(entry['categories'])}", ""]
-    links = [
-        f"[:material-information-outline: Details](catalog/{entry['id']}.md)",
-        link(":material-download: Download", entry["package"]),
-        link(":octicons-mark-github-16: Homepage", entry.get("homepage"), "{ target=_blank }"),
-    ]
-    lines += ["    " + " · ".join(x for x in links if x), ""]
-    return "\n".join(lines).rstrip()
-
-
-def render_filters(entries: list[dict]) -> str:
-    """Renders the search box and category filters (revealed by catalog.js).
-
-    Args:
-        entries: The registry entries.
-
-    Returns:
-        The HTML block.
-    """
-    categories = sorted({c for e in entries for c in e.get("categories") or [] if tags([c])})
-    buttons = "\n".join(
-        f'    <button type="button" data-category="{html.escape(c)}" aria-pressed="false">{html.escape(c)}</button>' for c in categories
-    )
-    return (
-        '<div class="plugin-filters" hidden>\n'
-        '  <input type="search" class="plugin-search" placeholder="Search plugins, commands and tools" aria-label="Search plugins">\n'
-        '  <div class="plugin-categories" role="group" aria-label="Filter by category">\n'
-        f"{buttons}\n"
-        "  </div>\n"
-        '  <p class="plugin-count" aria-live="polite"></p>\n'
-        "</div>\n\n"
-    )
-
-
-def render_catalog(entries: list[tuple[dict, dict]]) -> str:
-    """Renders docs/catalog.md.
-
-    Args:
-        entries: (registry entry, manifest) pairs, by name.
+        count: How many plugins the registry lists.
 
     Returns:
         The page.
     """
-    n = len(entries)
     head = (
         "---\nhide:\n  - toc\n---\n\n# Plugin catalog\n\n"
-        f"There {'is' if n == 1 else 'are'} **{n}** {'plugin' if n == 1 else 'plugins'} in the registry. "
+        f"There {'is' if count == 1 else 'are'} **{count:,}** {'plugin' if count == 1 else 'plugins'} in the registry. "
         "To install one in RustGIS, open **Plugins › Plugin Manager › Browse** and choose **Install**. "
         "RustGIS shows what the plugin may do before installing it. "
         "On the command line, run `rustgis-cli plugins get <id>`.\n\n"
     )
-    if not entries:
+    if count == 0:
         return head + "_The registry is empty._\n"
-    cards = "\n\n".join(render_card(e, m) for e, m in entries)
-    # Each card's searchable text includes its commands and tools, which the card doesn't show.
-    extra = {e["id"]: " ".join([c.get("label", "") for c in m.get("commands", [])] + [t.get("name", "") for t in m.get("tools", [])]) for e, m in entries}
-    data = html.escape(json.dumps(extra), quote=True)
-    return head + render_filters([e for e, _ in entries]) + f'<div class="grid cards plugin-catalog" data-extra="{data}" markdown>\n\n{cards}\n\n</div>\n'
+    return head + (
+        '<div class="plugin-filters" hidden>\n'
+        '  <input type="search" class="plugin-search" placeholder="Search plugins, commands and tools" aria-label="Search plugins">\n'
+        '  <div class="plugin-categories" role="group" aria-label="Filter by category"></div>\n'
+        '  <p class="plugin-count" aria-live="polite"></p>\n'
+        "</div>\n"
+        '<div class="grid cards plugin-catalog" data-registry="/registry.json"><ul></ul></div>\n'
+        '<div class="plugin-more" aria-hidden="true"></div>\n'
+        "<noscript><p>The catalog needs JavaScript. The plugin list is also available as "
+        '<a href="/registry.json">registry.json</a>.</p></noscript>\n'
+    )
 
 
 def render_page(entry: dict, manifest: dict) -> str:
@@ -246,7 +167,9 @@ def render_page(entry: dict, manifest: dict) -> str:
     front = f"---\ntitle: {json.dumps(html.escape(name))}\n"
     if entry.get("description"):
         front += f"description: {json.dumps(html.escape(' '.join(entry['description'].split())))}\n"
-    front += "---\n\n"
+    # Kept out of the site search: the catalog searches plugins itself, and thousands of pages
+    # would make the search index every visitor downloads several megabytes.
+    front += "search:\n  exclude: true\n---\n\n"
     buttons = [
         f"[:material-download: Download {text(entry.get('version', ''))}]({safe_url(entry['package'])}){{ .md-button .md-button--primary }}"
     ]
@@ -353,7 +276,7 @@ def main() -> None:
         if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not safe_url(e.get("package")):
             raise SystemExit(f"refusing to write a page for {e.get('id')!r}")
         entries.append((e, manifests.get(e["id"], {})))
-    (DOCS / "catalog.md").write_text(render_catalog(entries))
+    (DOCS / "catalog.md").write_text(render_catalog(len(entries)))
     pages = DOCS / "catalog"
     pages.mkdir(exist_ok=True)
     for old in pages.glob("*.md"):
