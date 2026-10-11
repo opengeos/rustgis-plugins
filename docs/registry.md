@@ -48,6 +48,17 @@ a new `source`.
 It writes `dist/registry.json`. Then `python scripts/smoke.py` loads every package into the real
 `rustgis-cli` and runs its tools on the World Atlas sample.
 
+An automated Claude Code review also comments on each pull request: on the permissions, the
+commands the plugin runs and its manifest, and, for a package published elsewhere, on what the
+package holds. A first-time contributor's pull request is reviewed once a maintainer comments
+`/claude-review` or adds the `claude-review` label. A maintainer still reviews every plugin
+before it is merged.
+
+Name, version, description, author, homepage, license and permissions all come from the
+package's `plugin.json`, so the listing always matches what is installed. `categories` takes one
+to four of: Analysis, Cartography, Data, Editing, Example, Hydrology, Imagery, Raster, Sampling,
+Terrain, Utilities, Vector, Visualization.
+
 ## Try it before it is merged
 
 Each pull request that builds a plugin gets a preview on Cloudflare Pages, and a comment with an
@@ -68,17 +79,6 @@ request's code, publishes only the registry and the packages.
 
 !!! warning "Previews run unreviewed code"
     Install a preview's plugin only to review that pull request.
-
-An automated Claude Code review also comments on each pull request: on the permissions, the
-commands the plugin runs and its manifest, and, for a package published elsewhere, on what the
-package holds. A first-time contributor's pull request is reviewed once a maintainer comments
-`/claude-review` or adds the `claude-review` label. A maintainer still reviews every plugin
-before it is merged.
-
-Name, version, description, author, homepage, license and permissions all come from the
-package's `plugin.json`, so the listing always matches what is installed. `categories` takes one
-to four of: Analysis, Cartography, Data, Editing, Example, Hydrology, Imagery, Raster, Sampling,
-Terrain, Utilities, Vector, Visualization.
 
 ## Updating and withdrawing
 

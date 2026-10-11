@@ -164,6 +164,9 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
         if manifest is None or name.split("/", 1)[0] != e.get("id") or any(e.get(k) != manifest.get(k, d) for k, d in fields):
             print(f"preview: the entry for {pkg!r} doesn't describe the package it names", file=sys.stderr)
             return 1
+        # Each plugin once, however often the registry lists it.
+        if any(p.get("id") == e.get("id") for p in previewed):
+            continue
         previewed.append(e)
         if name in copied:
             continue
