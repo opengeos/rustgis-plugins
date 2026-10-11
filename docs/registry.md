@@ -59,6 +59,27 @@ package's `plugin.json`, so the listing always matches what is installed. `categ
 to four of: Analysis, Basemaps, Cartography, Data, Editing, Example, Hydrology, Imagery, Raster,
 Sampling, Terrain, Utilities, Vector, Visualization.
 
+## Try it before it is merged
+
+Each pull request that builds a plugin gets a preview on Cloudflare Pages, and a comment with an
+**Open in RustGIS** link:
+
+```text
+https://pr-<N>.rustgis-plugins-preview.pages.dev
+```
+
+The link opens [web.rustgis.app](https://web.rustgis.app)'s Plugin Manager on the preview's
+registry (its `?registry=` address parameter): every published plugin, with the pull request's
+new packages served from the preview.
+Install the plugin from **Browse**; RustGIS shows its permissions first. On the desktop, set
+**Plugin Manager › Settings › Plugin registry** to the preview's `registry.json`. The preview is
+updated on each push and removed when the pull request closes. Fork pull requests get one too:
+CI builds the packages with no secrets, and a separate workflow, which runs none of the pull
+request's code, publishes only the registry and the packages.
+
+!!! warning "Previews run unreviewed code"
+    Install a preview's plugin only to review that pull request.
+
 ## Updating and withdrawing
 
 Bump `version` in `plugin.json` (and `source` for a plugin hosted elsewhere). RustGIS shows an
