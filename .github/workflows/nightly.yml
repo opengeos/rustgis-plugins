@@ -14,6 +14,12 @@ env:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each shard runs every fourth plugin; raise it as the registry grows.
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -23,7 +29,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Read the registry (building only what changed)
+      # With the published index this builds nothing; it writes dist/registry.json to test.
+      - name: Read the registry
         run: python scripts/build.py --check
       - name: RustGIS commit to test against
         id: rustgis
@@ -39,4 +46,4 @@ jobs:
           cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ steps.rustgis.outputs.sha }}" rustgis-cli --root ~/rustgis-cli-root
           mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
       - name: Run every published plugin in RustGIS
-        run: python scripts/smoke.py --all --cli ~/rustgis-cli/rustgis-cli
+        run: python scripts/smoke.py --all --shard ${{ matrix.shard }}/4 --cli ~/rustgis-cli/rustgis-cli

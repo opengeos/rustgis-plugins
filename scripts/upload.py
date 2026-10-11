@@ -72,13 +72,19 @@ def main() -> int:
                 print(f"error: {name} is already published with different contents; bump the plugin's version", file=sys.stderr)
                 failures += 1
             continue
-        subprocess.run(
-            [
-                "npx", "--yes", WRANGLER, "r2", "object", "put", f"{BUCKET}/{name}", "--file", str(path), "--remote",
-                "--content-type", "application/zip", "--cache-control", "public, max-age=31536000, immutable",
-            ],
-            check=True,
-        )
+        try:
+            subprocess.run(
+                [
+                    "npx", "--yes", WRANGLER, "r2", "object", "put", f"{BUCKET}/{name}", "--file", str(path), "--remote",
+                    "--content-type", "application/zip", "--cache-control", "public, max-age=31536000, immutable",
+                ],
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as e:
+            # Counted, and the others still go up (the next run reuses what's there).
+            print(f"error: {name}: upload failed ({e})", file=sys.stderr)
+            failures += 1
+            continue
         got = fetch(url)
         if got is None or hashlib.sha256(got).hexdigest() != digest:
             print(f"error: {name} doesn't read back from {url} as uploaded", file=sys.stderr)

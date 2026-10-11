@@ -309,13 +309,16 @@ def tree_hash(folder: Path) -> str:
         The lower-case hex SHA-256 over every file's relative path and contents.
     """
     h = hashlib.sha256()
-
-    def counted(p: Path) -> bool:
-        rel = p.relative_to(folder).parts
-        # Not a build folder at the plugin's root, nor dot files (.DS_Store, editor state).
-        return p.is_file() and rel[0] != "target" and not any(part.startswith(".") for part in rel)
-
-    for f in sorted(p for p in folder.rglob("*") if counted(p)):
+    # The files git tracks (no build output, editor backups or links to elsewhere); every file
+    # when this isn't a git checkout.
+    try:
+        out = subprocess.run(["git", "ls-files", "-z", "--", "."], cwd=folder, capture_output=True, check=True).stdout
+        files = sorted(folder / f for f in out.decode().split("\0") if f)
+    except (OSError, subprocess.CalledProcessError):
+        files = sorted(p for p in folder.rglob("*") if p.is_file() and p.relative_to(folder).parts[0] != "target")
+    for f in files:
+        if not f.is_file() or f.is_symlink():
+            continue
         h.update(f.relative_to(folder).as_posix().encode() + b"\0")
         h.update(hashlib.sha256(f.read_bytes()).digest())
     return h.hexdigest()
@@ -593,6 +596,12 @@ def main() -> int:
                 if old is None or old[0] != manifest:
                     problem(f"{where}: plugin.json differs from the published {manifest['id']} {manifest['version']}; bump the version")
                     continue
+                if old[1] != wasm:
+                    print(
+                        f"warning: {where}: the rebuilt module differs from the published {manifest['id']} {manifest['version']}"
+                        " (a different toolchain, or code changed without a version bump); the published one is kept",
+                        file=sys.stderr,
+                    )
             data = existing if existing is not None else data
             digest, size, fresh = sha256(data), len(data), data if existing is None else None
         name = f"{manifest['id']}-{manifest['version']}.rgplugin"
