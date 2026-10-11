@@ -28,6 +28,7 @@ PACKAGE_RE = re.compile(r"^([a-z][a-z0-9-]{0,63})/\1-[0-9A-Za-z.+-]{1,64}\.rgplu
 MAX_PACKAGE = 64 * 1024 * 1024
 MAX_REGISTRY = 32 * 1024 * 1024
 WEB_APP = "https://web.rustgis.app/"
+PUBLISHED = "https://packages.rustgis.app/"
 
 
 def make(dist: Path, out: Path) -> int:
@@ -95,8 +96,20 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
     previewed = []
     for e in plugins:
         pkg = e.get("package", "") if isinstance(e, dict) else ""
-        if not isinstance(pkg, str) or not pkg.startswith("packages/"):
+        if not isinstance(pkg, str):
+            print("preview: an entry with no package", file=sys.stderr)
+            return 1
+        # Every package is either one this preview holds or a published one: a pull request
+        # can't point an entry anywhere else.
+        if pkg.startswith(PUBLISHED):
+            name = pkg.removeprefix(PUBLISHED)
+            if not PACKAGE_RE.match(name):
+                print(f"preview: {pkg!r} isn't a published package's address", file=sys.stderr)
+                return 1
             continue
+        if not pkg.startswith("packages/"):
+            print(f"preview: {pkg!r} is neither in this preview nor published", file=sys.stderr)
+            return 1
         name = pkg.removeprefix("packages/")
         src = data / "packages" / name
         if not PACKAGE_RE.match(name) or not src.is_file() or src.is_symlink() or src.stat().st_size > MAX_PACKAGE:
