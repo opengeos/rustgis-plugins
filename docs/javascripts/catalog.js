@@ -48,9 +48,19 @@
     return a;
   }
 
-  // A plugin's page, relative to the catalog page.
+  // The catalog page's folder (…/catalog/), with or without a trailing slash in the address:
+  // plugin pages and registry.json are found relative to it.
+  function base() {
+    const u = new URL(location.href);
+    u.search = "";
+    u.hash = "";
+    if (!u.pathname.endsWith("/")) u.pathname += "/";
+    return u.href;
+  }
+
+  // A plugin's page, beside the catalog page.
   function page(id) {
-    return new URL(`${encodeURIComponent(id)}/`, location.href).href;
+    return new URL(`${encodeURIComponent(id)}/`, base()).href;
   }
 
   function size(n) {
@@ -125,7 +135,7 @@
     const count = filters.querySelector(".plugin-count");
 
     // registry.json is at the site's root, given relative to this page.
-    registry ??= fetch(new URL(catalog.dataset.registry || "../registry.json", location.href), { cache: "no-cache" })
+    registry ??= fetch(new URL(catalog.dataset.registry || "../registry.json", base()), { cache: "no-cache" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .catch((e) => {
         registry = undefined;
@@ -218,7 +228,17 @@
         if (!("IntersectionObserver" in window)) while (rendered < shown.length) fill();
       })
       .catch((e) => {
-        catalog.replaceChildren(el("p", null, `The plugin list couldn't be loaded (${e.message}). It is also available as registry.json.`));
+        const msg = el("p", null, `The plugin list couldn't be loaded (${e.message}). `);
+        const retry = el("button", "md-button", "Retry");
+        retry.type = "button";
+        retry.addEventListener("click", () => {
+          // Start over: the fetch was forgotten when it failed.
+          msg.remove();
+          delete catalog.dataset.ready;
+          setUp();
+        });
+        msg.append(retry);
+        catalog.before(msg);
       });
   }
 
