@@ -117,7 +117,7 @@
     const links = el("p", "plugin-card-links");
     const parts = [
       link("Details", page(p.id)),
-      link(`Download (${size(p.size || 0)})`, p.package),
+      link(`Download (${size(Number.isFinite(p.size) ? p.size : 0)})`, p.package),
       link("Homepage", p.homepage, true),
     ].filter(Boolean);
     parts.forEach((a, i) => {
@@ -146,8 +146,8 @@
         registry = undefined;
         throw e;
       });
-    registry
-      .then((data) => {
+    registry.then(
+      (data) => {
         const plugins = (Array.isArray(data && data.plugins) ? data.plugins : []).filter((p) => p && typeof p.id === "string" && p.id);
         // Searchable text, made once.
         const text = plugins.map((p) =>
@@ -235,20 +235,22 @@
         filters.hidden = false;
         apply();
         if (!("IntersectionObserver" in window)) while (rendered < shown.length) fill();
-      })
-      .catch((e) => {
+      },
+      // Only a failed download offers Retry; a bug in rendering is reported, not retried.
+      (e) => {
         const msg = el("p", null, `The plugin list couldn't be loaded (${e.message}). `);
         const retry = el("button", "md-button", "Retry");
         retry.type = "button";
         retry.addEventListener("click", () => {
-          // Start over: the fetch was forgotten when it failed.
+          // Start over: the fetch was forgotten when it failed, and nothing was set up yet.
           msg.remove();
           delete catalog.dataset.ready;
           setUp();
         });
         msg.append(retry);
         catalog.before(msg);
-      });
+      },
+    );
   }
 
   if (typeof document$ !== "undefined" && document$.subscribe) document$.subscribe(setUp);
