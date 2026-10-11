@@ -4,6 +4,8 @@
     python scripts/build.py            # build plugins, package them, write dist/
     python scripts/build.py --check    # also fail on any problem (CI)
     python scripts/build.py --no-cargo # reuse the modules already built
+    python scripts/build.py --inspect <checkout> <out> registry/<id>.json...
+                                       # unpack the packages these entries point at, for review
 
 Each plugin has an entry in registry/<id>.json:
 
@@ -229,7 +231,72 @@ def download(url: str) -> bytes:
 # --------------------------------------------------------------------------------------------
 
 
+def inspect(checkout: Path, out: Path, files: list[str]) -> int:
+    """For code review: downloads the package each changed registry entry with a `source` points
+    at, checks its SHA-256, and writes what it holds to <out>/plugins/<id>/ (plugin.json, README,
+    module interface) and a summary to <out>/report.md. Packages are read as data, never run."""
+    out.mkdir(parents=True, exist_ok=True)
+    rows, notes = [], []
+    for f in files:
+        try:
+            reg = json.loads((checkout / f).read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            notes.append(f"- `{f}`: unreadable ({e})")
+            continue
+        src = reg.get("source")
+        if not isinstance(src, dict):
+            continue
+        pid = str(reg.get("id", ""))
+        if not ID_RE.match(pid):
+            notes.append(f"- `{f}`: invalid id, not inspected")
+            continue
+        try:
+            data = download(str(src.get("url", "")))
+        except Exception as e:  # noqa: BLE001 - reported as a finding
+            notes.append(f"- `{pid}`: could not be downloaded ({e}); not inspected")
+            continue
+        got = sha256(data)
+        if got != src.get("sha256"):
+            notes.append(f"- `{pid}`: SHA-256 mismatch (registry {src.get('sha256')}, download {got}); not inspected")
+            continue
+        read = read_package(data, pid)
+        if read is None:
+            notes.append(f"- `{pid}`: not a readable package; not inspected")
+            continue
+        manifest, wasm = read
+        dest = out / "plugins" / pid
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "plugin.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            names = z.namelist()
+            readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
+            if readme:
+                (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
+        try:
+            exports, imports = wasm_interface(wasm)
+        except (ValueError, IndexError) as e:
+            exports, imports = set(), [f"unreadable: {e}"]
+        (dest / "module.txt").write_text(
+            "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
+        )
+        rows.append(
+            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} |"
+        )
+    report = ["# Packages this PR points at", ""]
+    if rows:
+        report += ["| id | version | package | module | permissions | module imports |", "|---|---|---|---|---|---|", *rows, ""]
+    report += notes or ["All changed entries with a source were inspected."]
+    (out / "report.md").write_text("\n".join(report) + "\n")
+    print("\n".join(report))
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--inspect":
+        if len(sys.argv) < 4:
+            print("usage: build.py --inspect <checkout> <out> registry/<id>.json...", file=sys.stderr)
+            return 2
+        return inspect(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="exit with an error on any problem")
     ap.add_argument("--no-cargo", action="store_true", help="don't run cargo; use the modules already built")
