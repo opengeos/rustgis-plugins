@@ -75,6 +75,9 @@ def make(dist: Path, out: Path) -> int:
 def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
     """The registry entry build.py writes for a package with this manifest.
 
+    Keep it in step with the entry `build.py` builds: CI runs `--site` on its own build, so a
+    field added there and not here fails the pull request that adds it.
+
     Args:
         manifest: The package's plugin.json.
         e: The entry being checked (its categories, hash and size are taken from it; the hash
@@ -100,7 +103,7 @@ def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
         "permissions": manifest.get("permissions", []),
         "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", []) if isinstance(c, dict)],
         "tools": [t.get("name", "") for t in manifest.get("tools", []) if isinstance(t, dict)],
-        "tab": (manifest.get("tab") or {}).get("label", "") if isinstance(manifest.get("tab") or {}, dict) else "",
+        "tab": tab.get("label", "") if isinstance(tab := manifest.get("tab") or {}, dict) else "",
     }
 
 

@@ -611,6 +611,7 @@ def main() -> int:
             out.write_bytes(fresh)
             new.append(f"{manifest['id']}/{name}")
         packages.append({"id": manifest["id"], "version": manifest["version"], "sha256": digest, "size": size, "origin": origin, "manifest": manifest})
+        # scripts/preview.py's entry_for() makes the same entry from a manifest (CI checks they agree).
         entries.append(
             {
                 "id": manifest["id"],
