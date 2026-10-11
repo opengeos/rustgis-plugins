@@ -63,7 +63,10 @@ Terrain, Utilities, Vector, Visualization.
 
 Bump `version` in `plugin.json` (and `source` for a plugin hosted elsewhere). RustGIS shows an
 **Update** button to everyone with an older version. Published packages never change, so CI
-refuses an in-repository plugin whose files changed without a version bump. Every published
+refuses an in-repository plugin whose files changed without a version bump. This covers the
+plugin's own folder (its source, `plugin.json` and README), compared with what was last
+published. A change to the shared SDK or the workspace lockfile doesn't republish existing
+versions; bump a plugin's version to ship it. Every published
 version stays available at its URL.
 
 Maintainers withdraw a plugin by adding it to `blocklist.json`. `{"id": "...", "reason": "..."}`

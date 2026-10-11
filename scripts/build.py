@@ -298,7 +298,8 @@ def download(url: str) -> bytes:
 
 def tree_hash(folder: Path) -> str:
     """Hashes an in-repository plugin's files (its source, manifest and README), so a change
-    without a version bump can be caught.
+    without a version bump can be caught. Only the plugin's own folder counts: a change to the
+    shared SDK, the workspace lockfile or the toolchain doesn't republish existing versions.
 
     Args:
         folder: The plugin's folder.
@@ -307,7 +308,13 @@ def tree_hash(folder: Path) -> str:
         The lower-case hex SHA-256 over every file's relative path and contents.
     """
     h = hashlib.sha256()
-    for f in sorted(p for p in folder.rglob("*") if p.is_file() and "target" not in p.relative_to(folder).parts):
+
+    def counted(p: Path) -> bool:
+        rel = p.relative_to(folder).parts
+        # Not a build folder at the plugin's root, nor dot files (.DS_Store, editor state).
+        return p.is_file() and rel[0] != "target" and not any(part.startswith(".") for part in rel)
+
+    for f in sorted(p for p in folder.rglob("*") if counted(p)):
         h.update(f.relative_to(folder).as_posix().encode() + b"\0")
         h.update(hashlib.sha256(f.read_bytes()).digest())
     return h.hexdigest()
@@ -378,16 +385,20 @@ def valid_cached(p: object) -> bool:
 
 
 def published(url: str) -> bytes | None:
-    """Downloads a package already in the bucket.
+    """Downloads a package already in the bucket (bypassing caches, so a cached 404 isn't
+    believed).
 
     Args:
         url: The package's URL.
 
     Returns:
         Its bytes, or None when it isn't there.
+
+    Raises:
+        Exception: when the bucket can't be asked (anything but a 404).
     """
     try:
-        return download(url)
+        return download(f"{url}?{time.time_ns()}")
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
@@ -495,7 +506,11 @@ def main() -> int:
             if not manifest_path.is_file():
                 problem(f"{where}: {reg['path']}/plugin.json is missing")
                 continue
-            version = str(json.loads(manifest_path.read_text()).get("version", ""))
+            try:
+                version = str(json.loads(manifest_path.read_text()).get("version", ""))
+            except (OSError, json.JSONDecodeError) as e:
+                problem(f"{where}: {reg['path']}/plugin.json: {e}")
+                continue
             tree = tree_hash(folder)
             origin = {"path": reg["path"], "tree": tree}
             if cached and cached.get("version") == version and cached.get("origin", {}).get("path"):
@@ -562,7 +577,11 @@ def main() -> int:
             # A version already in the bucket is never replaced: reuse it (a rebuild needn't be
             # byte-identical), unless it's a different plugin under that name.
             url = f"{PACKAGES_URL}/{manifest['id']}/{manifest['id']}-{manifest['version']}.rgplugin"
-            existing = None if args.no_bucket else published(url)
+            try:
+                existing = None if args.no_bucket else published(url)
+            except Exception as e:  # noqa: BLE001 - reported like the other downloads
+                problem(f"{where}: can't check {url}: {e}")
+                continue
             if existing is not None and how == "download" and sha256(existing) != sha256(data):
                 problem(f"{where}: {manifest['id']} {manifest['version']} is already published with different contents; bump the version")
                 continue
