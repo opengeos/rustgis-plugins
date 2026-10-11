@@ -12,6 +12,7 @@ registry.json never lists a package the bucket can't serve.
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import time
@@ -25,6 +26,7 @@ BUCKET = "rustgis-plugins"
 PACKAGES_URL = "https://packages.rustgis.app"
 # An exact version: it runs with a token that can write to the bucket.
 WRANGLER = "wrangler@4.145.0"
+KEY_RE = re.compile(r"[a-z][a-z0-9-]{0,63}/[a-z][a-z0-9-]{0,63}-\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*\.rgplugin")
 
 
 def fetch(url: str) -> bytes | None:
@@ -52,6 +54,12 @@ def main() -> int:
     names = [n.strip() for n in (DIST / "new.txt").read_text().splitlines() if n.strip()]
     failures = 0
     for name in names:
+        # <id>/<id>-<version>.rgplugin and nothing else: never a key outside the plugin's prefix.
+        pid, _, file_name = name.partition("/")
+        if not KEY_RE.fullmatch(name) or not file_name.startswith(f"{pid}-"):
+            print(f"error: {name} isn't a package key (<id>/<id>-<version>.rgplugin)", file=sys.stderr)
+            failures += 1
+            continue
         path = DIST / "packages" / name
         data = path.read_bytes()
         digest = hashlib.sha256(data).hexdigest()

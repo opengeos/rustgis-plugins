@@ -55,7 +55,8 @@ DIST = ROOT / "dist"
 TARGET = ROOT / "target" / "wasm32-unknown-unknown" / "release"
 
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
-VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+].*)?$")
+# Versions name objects in the bucket, so only safe characters: 1.2.3, 1.2.3-beta.1, 1.2.3+build.5.
+VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool"}

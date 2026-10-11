@@ -13,6 +13,7 @@ command may need a selection or a layer the sample doesn't have).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -25,6 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
+MAX_PACKAGE = 64 * 1024 * 1024
 # A sample layer for each layer kind, and a field of it.
 SAMPLE = {"polygonLayer": "Countries", "pointLayer": "Cities", "vectorLayer": "Countries", "layer": "Countries"}
 FIELDS = {"field": "name", "numericField": "pop_est"}
@@ -61,11 +63,17 @@ def main() -> int:
                 try:
                     req = urllib.request.Request(e["package"], headers={"User-Agent": "rustgis-plugins-smoke"})
                     with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310 - https only, checked above
-                        package.write_bytes(r.read())
+                        data = r.read(MAX_PACKAGE + 1)
                 except Exception as err:  # noqa: BLE001 - one bad download mustn't stop the run
                     print(f"error: {e['id']}: can't download {e['package']}: {err}")
                     failures += 1
                     continue
+                # Test what users install: the bytes the registry lists.
+                if len(data) > MAX_PACKAGE or hashlib.sha256(data).hexdigest() != e.get("sha256"):
+                    print(f"error: {e['id']}: {e['package']} doesn't match the registry's SHA-256")
+                    failures += 1
+                    continue
+                package.write_bytes(data)
             print(f"== {e['id']} {e['version']}")
             listed = run(args.cli, package, ["info.commands"], plugins_dir)
             if listed.returncode != 0:
