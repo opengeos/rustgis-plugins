@@ -39,23 +39,27 @@ permissions:
   pull-requests: write
   actions: read
 
-concurrency:
-  group: plugin-preview-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}
-  cancel-in-progress: true
-
 env:
   PROJECT: rustgis-plugins-preview
 
+# Publishing and removing a pull request's preview share one concurrency group per pull request
+# (plugin-preview-pr-<N>) and never cancel each other, so they run one after the other: a
+# removal can't be overtaken by a publish that was already under way. Only `resolve` can tell
+# which pull request a CI run belongs to, so publishing is a job of its own.
 jobs:
-  deploy:
-    name: Publish the preview
+  resolve:
+    name: Build the preview site
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.repository == 'opengeos/rustgis-plugins'
     runs-on: ubuntu-latest
-    env:
-      HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
+    concurrency:
+      group: plugin-preview-run-${{ github.event.workflow_run.head_sha }}
+      cancel-in-progress: true
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
+      plugins: ${{ steps.site.outputs.plugins }}
     steps:
       # The base branch: its scripts/preview.py, not the pull request's.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,18 +110,45 @@ jobs:
           python3 scripts/preview.py --site preview-data "$PR" "$RUN_SHA" site
           echo "plugins=$(find site/packages -name '*.rgplugin' | wc -l)" >> "$GITHUB_OUTPUT"
 
+      - name: Hand the site to the publish job
+        if: steps.site.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-site
+          path: site
+          include-hidden-files: true
+          retention-days: 1
+
+  deploy:
+    name: Publish the preview
+    needs: resolve
+    if: needs.resolve.outputs.plugins != ''
+    runs-on: ubuntu-latest
+    concurrency:
+      group: plugin-preview-pr-${{ needs.resolve.outputs.number }}
+      cancel-in-progress: false
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
+    steps:
       - name: Say why there is no preview
-        if: steps.site.outcome == 'success' && env.HAS_TOKEN != 'true'
+        if: env.HAS_TOKEN != 'true'
         run: echo "::notice::CLOUDFLARE_PAGES_TOKEN is not set, so the preview isn't published."
+
+      - name: Fetch the site
+        if: env.HAS_TOKEN == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: preview-site
+          path: site
 
       # The pull request may have closed (and its preview been removed) while the site was
       # built: check again just before publishing.
       - name: Check the pull request is still open
         id: open
-        if: steps.site.outcome == 'success' && env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ steps.pr.outputs.number }}
+          PR: ${{ needs.resolve.outputs.number }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
@@ -143,7 +174,7 @@ jobs:
           command: >-
             pages deploy ${{ github.workspace }}/site
             --project-name=${{ env.PROJECT }}
-            --branch=pr-${{ steps.pr.outputs.number }}
+            --branch=pr-${{ needs.resolve.outputs.number }}
             --commit-hash=${{ github.event.workflow_run.head_sha }}
             --commit-dirty=true
 
@@ -151,11 +182,11 @@ jobs:
         if: steps.deploy.outputs.deployment-url != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          PR: ${{ steps.pr.outputs.number }}
+          PR: ${{ needs.resolve.outputs.number }}
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
           ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          PLUGINS: ${{ steps.site.outputs.plugins }}
+          PLUGINS: ${{ needs.resolve.outputs.plugins }}
         with:
           script: |
             const marker = '<!-- plugin-preview -->';
@@ -183,7 +214,7 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = Number(process.env.PR);
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
-            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            const existing = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.includes(marker));
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
             } else {
@@ -194,6 +225,9 @@ jobs:
     name: Remove the preview
     if: github.event_name == 'pull_request_target' && github.repository == 'opengeos/rustgis-plugins'
     runs-on: ubuntu-latest
+    concurrency:
+      group: plugin-preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     env:
       HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
     steps:
@@ -208,10 +242,16 @@ jobs:
           set -euo pipefail
           api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/$PROJECT/deployments"
           ids=""
-          for page in $(seq 1 20); do
+          page=1
+          while :; do
             got=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=25&page=$page&env=preview")
             [ "$(jq '.result | length' <<< "$got")" -gt 0 ] || break
             ids+=" $(jq -r --arg b "$BRANCH" '.result[] | select(.deployment_trigger.metadata.branch == $b) | .id' <<< "$got")"
+            page=$((page + 1))
+            if [ "$page" -gt 400 ]; then
+              echo "::warning::Stopped after 10,000 deployments; some of $BRANCH's may remain."
+              break
+            fi
           done
           for id in $ids; do
             curl -sf -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null && echo "deleted $id"
@@ -225,7 +265,7 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
-            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            const existing = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.includes(marker));
             if (existing) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id,
                 body: `${marker}\n### 🧩 Plugin preview\n\nRemoved: the pull request is closed.` });

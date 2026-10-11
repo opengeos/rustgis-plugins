@@ -17,6 +17,7 @@ landing page and headers itself, so a pull request can't publish pages of its ow
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -93,6 +94,7 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
     if not isinstance(plugins, list):
         print("preview: registry.json has no plugins list", file=sys.stderr)
         return 1
+    packages = (data / "packages").resolve()
     previewed = []
     for e in plugins:
         pkg = e.get("package", "") if isinstance(e, dict) else ""
@@ -112,12 +114,18 @@ def site(data: Path, pr: str, sha: str, out: Path) -> int:
             return 1
         name = pkg.removeprefix("packages/")
         src = data / "packages" / name
-        if not PACKAGE_RE.match(name) or not src.is_file() or src.is_symlink() or src.stat().st_size > MAX_PACKAGE:
-            print(f"preview: dropping {pkg!r}: not a package this preview holds", file=sys.stderr)
+        # Inside the preview's packages, whatever links the path goes through.
+        inside = src.resolve().is_relative_to(packages)
+        if not PACKAGE_RE.match(name) or not inside or not src.is_file() or src.is_symlink() or src.stat().st_size > MAX_PACKAGE:
+            print(f"preview: {pkg!r} is not a package this preview holds", file=sys.stderr)
+            return 1
+        body = src.read_bytes()
+        if hashlib.sha256(body).hexdigest() != e.get("sha256") or len(body) != e.get("size"):
+            print(f"preview: {pkg!r} doesn't match its registry entry's sha256 and size", file=sys.stderr)
             return 1
         dest = out / "packages" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src, dest)
+        dest.write_bytes(body)
         previewed.append(e)
     (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
     # RustGIS in the browser fetches the registry and packages from another origin.
