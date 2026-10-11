@@ -1,0 +1,92 @@
+{
+  "id": "map-explorer",
+  "name": "Map Explorer",
+  "version": "0.1.0",
+  "description": "A tab of its own for exploring the map: jump to a continent or a random place, select the largest features or a random sample, and summarize a layer's numeric fields.",
+  "author": "opengeos",
+  "homepage": "https://github.com/opengeos/rustgis-plugins/tree/main/plugins/map-explorer",
+  "license": "MIT",
+  "entry": "plugin.wasm",
+  "abi": 1,
+  "minRustgisVersion": "0.1.0",
+  "permissions": ["edit"],
+  "commands": [
+    { "id": "go-africa", "label": "Africa", "help": "Go to Africa.", "icon": "zoom_world" },
+    { "id": "go-asia", "label": "Asia", "help": "Go to Asia.", "icon": "zoom_world" },
+    { "id": "go-europe", "label": "Europe", "help": "Go to Europe.", "icon": "zoom_world" },
+    { "id": "go-north-america", "label": "North America", "help": "Go to North America.", "icon": "zoom_world" },
+    { "id": "go-south-america", "label": "South America", "help": "Go to South America.", "icon": "zoom_world" },
+    { "id": "go-oceania", "label": "Oceania", "help": "Go to Oceania.", "icon": "zoom_world" },
+    { "id": "random-place", "label": "Random\nPlace", "help": "Zoom to a random feature of the selected layer.", "icon": "locate" },
+    { "id": "select-largest", "label": "Largest", "help": "Select the 10 largest features of the selected layer (by area, or length for lines) and zoom to them.", "icon": "select", "params": "{\"count\"?: number}" },
+    { "id": "select-sample", "label": "Random\nSample", "help": "Select a random tenth of the selected layer's features.", "icon": "select_attr", "params": "{\"fraction\"?: number between 0 and 1}" },
+    { "id": "layer-report", "label": "Layer\nReport", "help": "Show the selected layer's feature count, fields and selection in the status bar.", "icon": "stats" }
+  ],
+  "tools": [
+    {
+      "id": "field-summary",
+      "name": "Field Summary",
+      "summary": "A table of count, minimum, maximum, mean and sum for each numeric field of a layer.",
+      "params": [
+        { "name": "input", "label": "Input features", "kind": "vectorLayer", "required": true }
+      ]
+    }
+  ],
+  "tab": {
+    "label": "Explorer",
+    "groups": [
+      {
+        "label": "Go To",
+        "items": [
+          {
+            "menu": "Continent",
+            "icon": "zoom_world",
+            "help": "Go to a continent.",
+            "items": ["go-africa", "go-asia", "go-europe", "go-north-america", "go-south-america", "go-oceania"]
+          },
+          "random-place"
+        ]
+      },
+      { "label": "Select", "items": ["select-largest", "select-sample"] },
+      { "label": "Inspect", "items": ["layer-report", "tool:field-summary"] }
+    ]
+  },
+  "i18n": {
+    "de": {
+      "Explorer": "Erkunden",
+      "Go To": "Gehe zu",
+      "Continent": "Kontinent",
+      "Africa": "Afrika",
+      "Asia": "Asien",
+      "Europe": "Europa",
+      "North America": "Nordamerika",
+      "South America": "Südamerika",
+      "Oceania": "Ozeanien",
+      "Random\nPlace": "Zufälliger\nOrt",
+      "Select": "Auswählen",
+      "Largest": "Größte",
+      "Random\nSample": "Zufalls-\nstichprobe",
+      "Inspect": "Untersuchen",
+      "Layer\nReport": "Ebenen-\nbericht",
+      "Field Summary": "Feldübersicht"
+    },
+    "zh-CN": {
+      "Explorer": "探索",
+      "Go To": "转到",
+      "Continent": "大洲",
+      "Africa": "非洲",
+      "Asia": "亚洲",
+      "Europe": "欧洲",
+      "North America": "北美洲",
+      "South America": "南美洲",
+      "Oceania": "大洋洲",
+      "Random\nPlace": "随机\n地点",
+      "Select": "选择",
+      "Largest": "最大",
+      "Random\nSample": "随机\n抽样",
+      "Inspect": "检查",
+      "Layer\nReport": "图层\n报告",
+      "Field Summary": "字段汇总"
+    }
+  }
+}

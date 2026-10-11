@@ -15,6 +15,7 @@ for the design, the permissions and the ABI.
 | [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins |
 | [`plugins/hello/`](plugins/hello) | **Hello RustGIS**, a starter plugin to copy: commands and a tool |
 | [`plugins/vector-toolkit/`](plugins/vector-toolkit) | **Vector Toolkit**: hexagon and square grids, random points in polygons |
+| [`plugins/map-explorer/`](plugins/map-explorer) | **Map Explorer**: a ribbon tab of its own (groups, a menu, a tool button) for jumping around the map, selecting and summarizing |
 | [`registry/`](registry) | one file per listed plugin |
 | [`blocklist.json`](blocklist.json) | withdrawn plugins |
 | [`scripts/build.py`](scripts/build.py) | builds, checks and packages everything into `dist/` |

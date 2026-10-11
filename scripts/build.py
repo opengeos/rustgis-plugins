@@ -51,6 +51,11 @@ CATEGORIES = {
     "Sampling", "Terrain", "Utilities", "Vector", "Visualization",
 }
 MAX_PACKAGE = 64 * 1024 * 1024
+# RustGIS's own tabs: a plugin's tab can't take their names.
+RESERVED_TABS = {
+    "project", "map", "insert", "analysis", "view", "edit", "imagery", "share", "plugins", "help",
+    "feature layer", "labeling", "data", "raster layer", "raster data", "layout",
+}
 # A fixed timestamp keeps packages byte-for-byte reproducible.
 ZIP_TIME = (2026, 1, 1, 0, 0, 0)
 
@@ -161,6 +166,49 @@ def check_manifest(m: dict, where: str) -> None:
         for p in t.get("params", []):
             if p.get("kind") not in PARAM_KINDS:
                 problem(f"{where}: tool {t.get('id')}: parameter {p.get('name')!r} has unknown kind {p.get('kind')!r}")
+
+
+def check_tab(m: dict, where: str) -> None:
+    """Checks a manifest's own ribbon tab: its label and that every item names a command or tool.
+
+    Args:
+        m: The manifest.
+        where: Where it came from, for messages.
+    """
+    tab = m.get("tab")
+    if tab is None:
+        return
+    if not isinstance(tab, dict):
+        problem(f"{where}: tab must be an object")
+        return
+    label = str(tab.get("label", "")).strip()
+    if not label or len(label) > 32 or "\n" in label:
+        problem(f"{where}: the tab's label must be one line of 1 to 32 characters")
+    if label.lower() in RESERVED_TABS:
+        problem(f"{where}: the tab can't be called '{label}', the name of one of RustGIS's tabs")
+    commands = {c.get("id") for c in m.get("commands", [])}
+    tools = {t.get("id") for t in m.get("tools", [])}
+
+    def entry(e: object) -> None:
+        ok = isinstance(e, str) and (e[5:] in tools if e.startswith("tool:") else e in commands)
+        if not ok:
+            problem(f"{where}: the tab names {e!r}, which isn't one of the plugin's commands or tools (tool:<id>)")
+
+    groups = tab.get("groups") or []
+    if not 1 <= len(groups) <= 8:
+        problem(f"{where}: the tab needs 1 to 8 groups")
+    for g in groups:
+        items = g.get("items") or []
+        if not g.get("label") or not 1 <= len(items) <= 16:
+            problem(f"{where}: tab group {g.get('label')!r} needs a label and 1 to 16 items")
+        for item in items:
+            if isinstance(item, dict):
+                if not item.get("menu") or not 1 <= len(item.get("items") or []) <= 32:
+                    problem(f"{where}: menu {item.get('menu')!r} needs a label and 1 to 32 items")
+                for e in item.get("items") or []:
+                    entry(e)
+            else:
+                entry(item)
 
 
 def check_module(wasm: bytes, where: str) -> None:
@@ -353,6 +401,7 @@ def main() -> int:
             continue
         manifest, wasm = read
         check_manifest(manifest, where)
+        check_tab(manifest, where)
         check_module(wasm, where)
         if manifest.get("id") != reg["id"]:
             problem(f"{where}: the package's id is '{manifest.get('id')}'")
@@ -378,6 +427,7 @@ def main() -> int:
                 "permissions": manifest.get("permissions", []),
                 "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", [])],
                 "tools": [t.get("name", "") for t in manifest.get("tools", [])],
+                "tab": (manifest.get("tab") or {}).get("label", ""),
             }
         )
 

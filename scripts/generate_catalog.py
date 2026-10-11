@@ -142,6 +142,8 @@ def what_it_adds(manifest: dict) -> str:
         For example "3 commands · 1 tool".
     """
     parts = []
+    if (manifest.get("tab") or {}).get("label"):
+        parts.append(f"its own **{text(manifest['tab']['label'])}** tab")
     for key, one, many in (("commands", "command", "commands"), ("tools", "tool", "tools")):
         n = len(manifest.get(key) or [])
         if n:
@@ -285,8 +287,14 @@ def render_page(entry: dict, manifest: dict) -> str:
     body += ["", "Plugins run in a sandbox with no other access to your computer or the network.", ""]
 
     commands = manifest.get("commands") or []
+    tab = manifest.get("tab") or {}
+    where = (
+        f"On the plugin's own **{text(tab['label'])}** tab, and in command search."
+        if tab.get("label")
+        else "On the **Plugins** tab, in a group named after the plugin, and in command search."
+    )
     if commands:
-        body += ["## Commands", "", "On the **Plugins** tab, in a group named after the plugin, and in command search.", ""]
+        body += ["## Commands", "", where, ""]
         body += ["| Command | Id | What it does |", "|---|---|---|"]
         for c in commands:
             cid = str(c.get("id", ""))
