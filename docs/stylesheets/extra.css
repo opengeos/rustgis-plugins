@@ -1,0 +1,73 @@
+/* Plugin catalog cards (docs/catalog.md). */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 0.5rem;
+}
+
+.md-typeset .plugin-card-meta,
+.md-typeset .plugin-card-perms {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .plugin-card-perms .twemoji {
+  color: var(--md-accent-fg-color);
+}
+
+.md-typeset .grid.cards code {
+  font-size: 0.68rem;
+}
+
+/* Search box and category filters (docs/javascripts/catalog.js). */
+.plugin-filters {
+  margin: 0 0 1.25rem;
+}
+
+.plugin-filters .plugin-search {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.3rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font: inherit;
+}
+
+.plugin-filters .plugin-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.plugin-filters .plugin-categories button {
+  cursor: pointer;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 1rem;
+  padding: 0.15rem 0.7rem;
+  background: transparent;
+  color: var(--md-default-fg-color);
+  font-size: 0.7rem;
+}
+
+.plugin-filters .plugin-categories button[aria-pressed="true"] {
+  background: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-bg-color);
+}
+
+.plugin-filters .plugin-count {
+  margin: 0.75rem 0 0;
+  font-size: 0.72rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .grid.cards > ul > li[hidden] {
+  display: none;
+}
+
+.md-typeset .md-button + .md-button {
+  margin-left: 0.4rem;
+}

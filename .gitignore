@@ -2,5 +2,6 @@
 /dist
 /site
 /docs/catalog.md
+/docs/catalog/
 .venv/
 __pycache__/

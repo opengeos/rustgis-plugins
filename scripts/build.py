@@ -18,7 +18,6 @@ plugin.json, so it can't disagree with what is installed. Output goes to dist/:
     dist/registry.json
     dist/blocklist.json
     dist/packages/<id>/<id>-<version>.rgplugin   (never changes once published)
-    dist/catalog.md                              (for the docs site)
 """
 
 from __future__ import annotations
@@ -39,7 +38,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 TARGET = ROOT / "target" / "wasm32-unknown-unknown" / "release"
-SITE_URL = "https://plugins.rustgis.app"
 
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+].*)?$")
@@ -327,46 +325,11 @@ def main() -> int:
     entries.sort(key=lambda e: e["name"].lower())
     (DIST / "registry.json").write_text(json.dumps({"version": 1, "plugins": entries}, indent=2, ensure_ascii=False) + "\n")
     (DIST / "blocklist.json").write_text(json.dumps(blocklist, indent=2) + "\n")
-    (DIST / "catalog.md").write_text(catalog(entries))
     print(f"{len(entries)} plugins -> {DIST.relative_to(ROOT)}/registry.json")
     if args.check and problems:
         print(f"{len(problems)} problems", file=sys.stderr)
         return 1
     return 0
-
-
-def catalog(entries: list[dict]) -> str:
-    """The catalog page for the docs site."""
-    perms = {"edit": "edits the project", "files": "reads and writes files"}
-    out = [
-        "# Plugin catalog",
-        "",
-        "Every plugin in the registry. Install them from **Plugins › Plugin Manager › Browse** in RustGIS,",
-        "or with `rustgis-cli plugins get <id>`.",
-        "",
-    ]
-    for e in entries:
-        out += [f"## {e['name']}", ""]
-        meta = [f"`{e['id']}`", f"version {e['version']}"]
-        if e["author"]:
-            meta.append(f"by {e['author']}")
-        if e["license"]:
-            meta.append(e["license"])
-        out += [" · ".join(meta), ""]
-        if e["description"]:
-            out += [e["description"], ""]
-        what = []
-        if e["commands"]:
-            what.append("**Commands:** " + ", ".join(e["commands"]))
-        if e["tools"]:
-            what.append("**Tools:** " + ", ".join(e["tools"]))
-        what.append("**Permissions:** " + (", ".join(perms.get(p, p) for p in e["permissions"]) or "reads the map only"))
-        out += ["  \n".join(what), ""]
-        links = [f"[Download]({SITE_URL}/{e['package']}) ({e['size'] / 1024:.0f} KB)"]
-        if e["homepage"]:
-            links.append(f"[Homepage]({e['homepage']})")
-        out += [" · ".join(links), "", f"SHA-256 `{e['sha256']}`", ""]
-    return "\n".join(out)
 
 
 if __name__ == "__main__":

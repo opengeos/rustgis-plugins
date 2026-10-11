@@ -30,7 +30,7 @@ jobs:
         run: python3 scripts/build.py --check
       - name: Build the site
         run: |
-          cp dist/catalog.md docs/catalog.md
+          python3 scripts/generate_catalog.py
           uv venv --python 3.12
           uv pip install -r requirements.txt
           .venv/bin/zensical build
