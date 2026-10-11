@@ -211,7 +211,9 @@
           rendered = 0;
           if (!shown.length) list.append(el("li", "plugin-none", "No plugins match."));
           fill();
-          topUp();
+          if ("IntersectionObserver" in window) topUp();
+          // Old browsers: every match at once.
+          else while (rendered < shown.length) fill();
         }
 
         // Load more when the marker after the list comes near the viewport.
@@ -238,7 +240,6 @@
         }
         filters.hidden = false;
         apply();
-        if (!("IntersectionObserver" in window)) while (rendered < shown.length) fill();
       },
       // Only a failed download offers Retry; a bug in rendering is reported, not retried.
       (e) => {
