@@ -76,6 +76,12 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
+      # A CI run that didn't upload a preview (it failed before, or was cancelled) is normal;
+      # say so, since a download error looks the same.
+      - name: Say why there is no preview data
+        if: steps.fetch.outcome != 'success'
+        run: echo "::notice::No plugin-preview artifact could be downloaded from CI run ${{ github.event.workflow_run.id }}; no preview."
+
       - name: Find the pull request
         id: pr
         if: steps.fetch.outcome == 'success'

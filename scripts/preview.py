@@ -162,6 +162,9 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
     if not isinstance(plugins, list):
         print("preview: registry.json has no plugins list", file=sys.stderr)
         return 1
+    if (data / "packages").is_symlink():
+        print("preview: the packages folder is a link", file=sys.stderr)
+        return 1
     packages = (data / "packages").resolve()
     kept: list = []
     previewed = []

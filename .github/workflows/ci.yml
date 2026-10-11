@@ -58,7 +58,7 @@ jobs:
           printf '{"pr": %s, "sha": "%s"}\n' "$PR" "$HEAD_SHA" > preview/pr.json
       - name: Upload the preview
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: plugin-preview
           path: preview
