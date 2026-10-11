@@ -117,7 +117,7 @@
     const links = el("p", "plugin-card-links");
     const parts = [
       link("Details", page(p.id)),
-      link(`Download (${size(Number.isFinite(p.size) ? p.size : 0)})`, p.package),
+      link(Number.isFinite(p.size) && p.size > 0 ? `Download (${size(p.size)})` : "Download", p.package),
       link("Homepage", p.homepage, true),
     ].filter(Boolean);
     parts.forEach((a, i) => {
