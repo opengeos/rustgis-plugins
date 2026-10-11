@@ -20,6 +20,11 @@
 
   let registry; // the fetch, shared by page changes
 
+  // A list field, whatever the registry holds there.
+  function arr(x) {
+    return Array.isArray(x) ? x.filter((v) => typeof v === "string") : [];
+  }
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -86,12 +91,12 @@
     const meta = p.version ? [p.version] : [];
     if (p.author) meta.push(`by ${p.author}`);
     if (p.tab) meta.push(`its own ${p.tab} tab`);
-    const nc = (p.commands || []).length;
-    const nt = (p.tools || []).length;
+    const nc = arr(p.commands).length;
+    const nt = arr(p.tools).length;
     if (nc) meta.push(`${nc} ${nc === 1 ? "command" : "commands"}`);
     if (nt) meta.push(`${nt} ${nt === 1 ? "tool" : "tools"}`);
     li.append(el("span", "plugin-card-meta", meta.join(" · ")));
-    const perms = (p.permissions || []).filter((x) => PERMISSIONS[x]);
+    const perms = arr(p.permissions).filter((x) => PERMISSIONS[x]);
     const permLine = el("span", "plugin-card-perms");
     if (perms.length) {
       perms.forEach((x, i) => {
@@ -107,7 +112,7 @@
     }
     li.append(permLine);
     const tags = el("p", "plugin-card-tags");
-    for (const c of p.categories || []) tags.append(el("code", null, c), " ");
+    for (const c of arr(p.categories)) tags.append(el("code", null, c), " ");
     if (tags.childNodes.length) li.append(tags);
     const links = el("p", "plugin-card-links");
     const parts = [
@@ -146,13 +151,14 @@
         const plugins = (data.plugins || []).filter((p) => p && p.id);
         // Searchable text, made once.
         const text = plugins.map((p) =>
-          [p.name, p.id, p.description, p.author, p.tab, ...(p.categories || []), ...(p.commands || []), ...(p.tools || [])]
+          [p.name, p.id, p.description, p.author, p.tab, ...arr(p.categories), ...arr(p.commands), ...arr(p.tools)]
             .filter(Boolean)
             .join(" ")
             .toLowerCase(),
         );
         const selected = new Set();
-        const categories = [...new Set(plugins.flatMap((p) => p.categories || []))].sort();
+        const categories = [...new Set(plugins.flatMap((p) => arr(p.categories)))].sort();
+        boxes.replaceChildren();
         for (const c of categories) {
           const b = el("button", null, c);
           b.type = "button";
@@ -189,7 +195,7 @@
           shown = [];
           plugins.forEach((p, i) => {
             if (!words.every((w) => text[i].includes(w))) return;
-            if (selected.size && !(p.categories || []).some((c) => selected.has(c))) return;
+            if (selected.size && !arr(p.categories).some((c) => selected.has(c))) return;
             shown.push(i);
           });
           const noun = plugins.length === 1 ? "plugin" : "plugins";
