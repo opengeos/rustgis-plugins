@@ -1,0 +1,211 @@
+# Publishes each pull request's plugins to Cloudflare Pages, so reviewers can install them in
+# https://web.rustgis.app before they are merged:
+#
+#   https://pr-<N>.rustgis-plugins-preview.pages.dev  ->  "Open in RustGIS"
+#   = https://web.rustgis.app/?registry=https://pr-<N>.rustgis-plugins-preview.pages.dev/registry.json
+#
+# The preview's registry lists every plugin, with the pull request's new packages served from
+# the preview itself. A sticky comment carries the link; the preview is deleted when the pull
+# request closes.
+#
+# HOW IT STAYS SAFE
+# CI (ci.yml) builds the pull request's plugins with no secrets and uploads the result as the
+# `plugin-preview` artifact. This workflow runs the base branch's code only (workflow_run and
+# pull_request_target always do), holds the Cloudflare token, and never checks out or runs the
+# pull request: from the artifact it takes registry.json and .rgplugin packages alone, checked
+# by scripts/preview.py --site, which writes the landing page and headers itself. The artifact's
+# pull request number is trusted only once that pull request's head is the commit CI built.
+# So fork pull requests, the usual way plugins arrive, get previews too.
+#
+# SETUP (one time)
+#   CLOUDFLARE_PAGES_TOKEN - an API token with Account > Cloudflare Pages > Edit
+#   CLOUDFLARE_ACCOUNT_ID  - already set for the package bucket
+# The Pages project `rustgis-plugins-preview` exists already. Without the token, previews are
+# skipped with a notice.
+name: Plugin preview
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: plugin-preview-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: rustgis-plugins-preview
+
+jobs:
+  deploy:
+    name: Publish the preview
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.repository == 'opengeos/rustgis-plugins'
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
+    steps:
+      # The base branch: its scripts/preview.py, not the pull request's.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Fetch the preview from the CI run
+        id: fetch
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: plugin-preview
+          path: preview-data
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Find the pull request
+        id: pr
+        if: steps.fetch.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pr=$(jq -r '.pr' preview-data/pr.json)
+          if ! [[ "$pr" =~ ^[0-9]{1,7}$ ]]; then
+            echo "::error::The preview names no pull request."
+            exit 1
+          fi
+          # Trust the number only if that pull request's head is the commit CI built (and it's
+          # still open): fork runs don't say which pull request they belong to.
+          read -r head state < <(gh api "repos/${{ github.repository }}/pulls/$pr" --jq '"\(.head.sha) \(.state)"')
+          if [ "$head" != "$RUN_SHA" ] || [ "$state" != open ]; then
+            echo "::notice::#$pr has moved on from $RUN_SHA (or is closed); a later run publishes it."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+
+      - name: Build the site
+        id: site
+        if: steps.pr.outputs.number != ''
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/preview.py --site preview-data "$PR" "$RUN_SHA" site
+          echo "plugins=$(find site/packages -name '*.rgplugin' | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Say why there is no preview
+        if: steps.site.outcome == 'success' && env.HAS_TOKEN != 'true'
+        run: echo "::notice::CLOUDFLARE_PAGES_TOKEN is not set, so the preview isn't published."
+
+      - name: Create a scratch directory for wrangler
+        if: steps.site.outcome == 'success' && env.HAS_TOKEN == 'true'
+        run: mkdir -p .wrangler-deploy
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        if: steps.site.outcome == 'success' && env.HAS_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: .wrangler-deploy
+          command: >-
+            pages deploy ${{ github.workspace }}/site
+            --project-name=${{ env.PROJECT }}
+            --branch=pr-${{ steps.pr.outputs.number }}
+            --commit-hash=${{ github.event.workflow_run.head_sha }}
+            --commit-dirty=true
+
+      - name: Comment the preview on the pull request
+        if: steps.deploy.outputs.deployment-url != ''
+        uses: actions/github-script@v9
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PLUGINS: ${{ steps.site.outputs.plugins }}
+        with:
+          script: |
+            const marker = '<!-- plugin-preview -->';
+            const site = process.env.ALIAS_URL || process.env.DEPLOY_URL;
+            const registry = `${site}/registry.json`;
+            const open = `https://web.rustgis.app/?registry=${encodeURIComponent(registry)}`;
+            const n = Number(process.env.PLUGINS);
+            const body = [
+              marker,
+              '### 🧩 Plugin preview',
+              '',
+              n > 0
+                ? `**[Open in RustGIS](${open})**: web.rustgis.app's Plugin Manager on this pull request's registry. Install the plugin from **Browse**; RustGIS shows its permissions first.`
+                : 'This pull request builds no new plugin package, so the preview lists the published plugins only.',
+              '',
+              '| Item | Value |',
+              '| --- | --- |',
+              `| Preview | ${site} |`,
+              `| Registry (desktop: Plugin Manager › Settings) | ${registry} |`,
+              `| This commit | ${process.env.DEPLOY_URL} |`,
+              `| Commit | \`${process.env.HEAD_SHA.slice(0, 7)}\` |`,
+              '',
+              '_Unreviewed code: install it only to review this pull request._',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = Number(process.env.PR);
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  remove:
+    name: Remove the preview
+    if: github.event_name == 'pull_request_target' && github.repository == 'opengeos/rustgis-plugins'
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN != '' }}
+    steps:
+      # Deletes the pull request's deployments. Nothing from the pull request is checked out.
+      - name: Delete the deployments
+        if: env.HAS_TOKEN == 'true'
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: pr-${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/pages/projects/$PROJECT/deployments"
+          ids=""
+          for page in $(seq 1 20); do
+            got=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" "$api?per_page=25&page=$page&env=preview")
+            [ "$(jq '.result | length' <<< "$got")" -gt 0 ] || break
+            ids+=" $(jq -r --arg b "$BRANCH" '.result[] | select(.deployment_trigger.metadata.branch == $b) | .id' <<< "$got")"
+          done
+          for id in $ids; do
+            curl -sf -X DELETE -H "Authorization: Bearer $CF_TOKEN" "$api/$id?force=true" > /dev/null && echo "deleted $id"
+          done
+
+      - name: Mark the comment
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- plugin-preview -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id,
+                body: `${marker}\n### 🧩 Plugin preview\n\nRemoved: the pull request is closed.` });
+            }

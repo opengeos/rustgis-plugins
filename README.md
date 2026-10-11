@@ -21,6 +21,7 @@ for the design, the permissions and the ABI.
 | [`scripts/build.py`](scripts/build.py) | builds, checks and packages what changed into `dist/` |
 | [`scripts/upload.py`](scripts/upload.py) | uploads new packages to `packages.rustgis.app` |
 | [`scripts/smoke.py`](scripts/smoke.py) | runs new packages (or `--all`) in `rustgis-cli` |
+| [`scripts/preview.py`](scripts/preview.py) | makes a pull request's plugin preview from `dist/` |
 | [`docs/`](docs) | the site at plugins.rustgis.app |
 
 ## Build
@@ -49,6 +50,7 @@ with its SHA-256.
   - `packages.rustgis.app` serves the packages from the `rustgis-plugins` Cloudflare R2 bucket, at `<id>/<id>-<version>.rgplugin`. Packages never change once published, and every version stays available.
 - **Incremental builds:** each push to `main` builds only what changed. `scripts/build.py` reads the previous deploy's `packages.json` and builds or downloads only plugins whose version or source changed. An in-repo plugin whose files changed without a version bump fails the check.
 - **Upload before deploy:** `scripts/upload.py` puts the new packages in the bucket, checking each one back, before the registry is deployed. It needs the `CLOUDFLARE_R2_TOKEN` secret (a Cloudflare API token with *Workers R2 Storage: Edit*) and `CLOUDFLARE_ACCOUNT_ID`.
+- **Previews:** each pull request's new packages are published to Cloudflare Pages (`pr-<N>.rustgis-plugins-preview.pages.dev`, the `rustgis-plugins-preview` project) by `plugin-preview.yml`, with an **Open in RustGIS** link that opens web.rustgis.app on the preview's registry. It needs the `CLOUDFLARE_PAGES_TOKEN` secret (an API token with *Cloudflare Pages: Edit*).
 - **CI:** pull requests build and run only the plugins they change. The **Nightly** workflow runs every published plugin in the latest RustGIS.
 
 Code is MIT licensed. Each plugin states its own license in its `plugin.json`.
