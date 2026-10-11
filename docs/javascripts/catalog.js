@@ -148,7 +148,7 @@
       });
     registry
       .then((data) => {
-        const plugins = (data.plugins || []).filter((p) => p && p.id);
+        const plugins = (Array.isArray(data && data.plugins) ? data.plugins : []).filter((p) => p && typeof p.id === "string" && p.id);
         // Searchable text, made once.
         const text = plugins.map((p) =>
           [p.name, p.id, p.description, p.author, p.tab, ...arr(p.categories), ...arr(p.commands), ...arr(p.tools)]
@@ -212,12 +212,15 @@
 
         // Load more when the marker after the list comes near the viewport.
         if ("IntersectionObserver" in window) {
-          new IntersectionObserver(
+          const observer = new IntersectionObserver(
             (seen) => {
+              // Gone with a page change (instant navigation): let it go.
+              if (!more.isConnected) return observer.disconnect();
               if (seen.some((e) => e.isIntersecting)) topUp();
             },
             { rootMargin: "800px 0px" },
-          ).observe(more);
+          );
+          observer.observe(more);
         } else {
           // Old browsers: everything at once.
           more.remove();
