@@ -90,7 +90,10 @@ To try it while you work, load the folder instead of a package. In RustGIS, use
   `plugin:<id>/<command>`, which the ribbon, command search, scripts and `rustgis-cli` use.
 - `version` and `minRustgisVersion` look like `1.2.3`. RustGIS refuses a plugin that needs a
   newer RustGIS.
-- `permissions`: `edit` and `files` (see [Safety](index.md#safety)). Ask only for what you use.
+- `permissions`: `edit`, `files` and `network` (see [Safety](index.md#safety)). Ask only for what
+  you use. `network` lets the plugin add web tile layers (`map.addTiles`), which the map loads
+  from the addresses the plugin gives; an address can carry data, so it is a permission of its
+  own.
 - `commands[].icon`: the name of one of RustGIS's own icons (`stats`, `zoom_full`, `bookmark`,
   `buffer`…), or a puzzle piece when it isn't one.
 - Tool parameter `kind`s: `layer`, `vectorLayer`, `polygonLayer`, `pointLayer`, `field`,
@@ -145,6 +148,8 @@ Inside a request, `host::call(op, params)` sends one of these to RustGIS:
 | `host.view` | `{center: [lon, lat], scale, projection}` |
 | `host.notify` `{text, error?}` | shows a message in the status bar |
 | `host.addLayer` `{name, geojson}` | adds a layer (`edit`) |
+| `map.addTiles` `{url, kind?, name?, attribution?, maxZoom?, overlay?, replace?}` | adds a web tile layer: raster tiles, vector tiles or a MapLibre style (`edit` and `network`) |
+| `map.tiles`, `map.removeTiles`, `map.setTiles` | lists, removes and changes the map's tile layers |
 | any command id (`layer.zoomTo`, `select.byAttributes`, `layer.symbology`…) | what the command returns, within the plugin's permissions |
 
 `rustgis-cli commands` lists every command id and its parameters.

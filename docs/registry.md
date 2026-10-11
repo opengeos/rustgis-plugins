@@ -56,8 +56,8 @@ before it is merged.
 
 Name, version, description, author, homepage, license and permissions all come from the
 package's `plugin.json`, so the listing always matches what is installed. `categories` takes one
-to four of: Analysis, Cartography, Data, Editing, Example, Hydrology, Imagery, Raster, Sampling,
-Terrain, Utilities, Vector, Visualization.
+to four of: Analysis, Basemaps, Cartography, Data, Editing, Example, Hydrology, Imagery, Raster,
+Sampling, Terrain, Utilities, Vector, Visualization.
 
 ## Updating and withdrawing
 

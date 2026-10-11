@@ -41,6 +41,7 @@ KINDS = {
 PERMISSIONS = {
     "edit": ("Edits the project", "Can change the project: run commands that edit it and add layers."),
     "files": ("Reads and writes files", "Can run commands that read or write files on your computer."),
+    "network": ("Loads map tiles from the web", "Can add web tile layers, which the map loads from addresses the plugin chooses."),
 }
 
 

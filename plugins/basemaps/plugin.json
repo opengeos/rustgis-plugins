@@ -1,0 +1,518 @@
+{
+  "id": "basemaps",
+  "name": "Basemaps",
+  "version": "0.1.0",
+  "description": "A tab of public basemaps that need no API key: OpenStreetMap, Esri, USGS and NASA raster tiles, OpenFreeMap and VersaTiles vector maps, and overlays for labels, roads, railways and trails. Basemaps replace each other; overlays stack on top.",
+  "author": "opengeos",
+  "homepage": "https://github.com/opengeos/rustgis-plugins/tree/main/plugins/basemaps",
+  "license": "MIT",
+  "entry": "plugin.wasm",
+  "abi": 1,
+  "minRustgisVersion": "0.1.0",
+  "permissions": [
+    "edit",
+    "network"
+  ],
+  "commands": [
+    {
+      "id": "osm",
+      "label": "OpenStreetMap",
+      "help": "The standard OpenStreetMap map.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "osm-hot",
+      "label": "OSM Humanitarian",
+      "help": "OpenStreetMap in the Humanitarian OpenStreetMap Team's style.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "osm-de",
+      "label": "OSM Germany",
+      "help": "OpenStreetMap in the German style.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "osm-fr",
+      "label": "OSM France",
+      "help": "OpenStreetMap in the French style.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "cyclosm",
+      "label": "CyclOSM",
+      "help": "OpenStreetMap for cycling: bike lanes, routes and parking.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "opentopomap",
+      "label": "OpenTopoMap",
+      "help": "A topographic map from OpenStreetMap and SRTM elevation.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-streets",
+      "label": "Esri World Street Map",
+      "help": "Esri's street map of the world.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-topo",
+      "label": "Esri World Topographic",
+      "help": "Esri's topographic map of the world.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-light-gray",
+      "label": "Esri Light Gray Canvas",
+      "help": "Esri's light grey canvas, for data to stand out on.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-dark-gray",
+      "label": "Esri Dark Gray Canvas",
+      "help": "Esri's dark grey canvas.",
+      "icon": "dark",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-natgeo",
+      "label": "Esri National Geographic",
+      "help": "The National Geographic style world map.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-ocean",
+      "label": "Esri Ocean",
+      "help": "Esri's ocean basemap with bathymetry.",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-imagery",
+      "label": "Esri World Imagery",
+      "help": "Satellite and aerial imagery of the world.",
+      "icon": "raster_layer",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "usgs-imagery",
+      "label": "USGS Imagery",
+      "help": "The National Map's orthoimagery (United States, and the world at small scales).",
+      "icon": "raster_layer",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "usgs-imagery-topo",
+      "label": "USGS Imagery Topo",
+      "help": "The National Map's orthoimagery with topographic labels.",
+      "icon": "raster_layer",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "nasa-blue-marble",
+      "label": "NASA Blue Marble",
+      "help": "NASA's Blue Marble: the Earth's surface with shaded relief and bathymetry.",
+      "icon": "globe_view",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "nasa-night-lights",
+      "label": "NASA Earth at Night",
+      "help": "City lights at night from VIIRS (2012).",
+      "icon": "dark",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "usgs-topo",
+      "label": "USGS Topo",
+      "help": "The National Map's topographic basemap (United States).",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "usgs-shaded-relief",
+      "label": "USGS Shaded Relief",
+      "help": "The National Map's shaded relief (United States).",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-terrain",
+      "label": "Esri World Terrain",
+      "help": "Esri's terrain basemap: relief and bathymetry.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-shaded-relief",
+      "label": "Esri Shaded Relief",
+      "help": "Esri's shaded relief of the world.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-physical",
+      "label": "Esri Physical",
+      "help": "Esri's physical map: natural vegetation and relief.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-hillshade",
+      "label": "Esri World Hillshade",
+      "help": "Esri's hillshade of the world's elevation.",
+      "icon": "relief",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-liberty",
+      "label": "OpenFreeMap Liberty",
+      "help": "OpenFreeMap's Liberty: a detailed vector map of the world.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-bright",
+      "label": "OpenFreeMap Bright",
+      "help": "OpenFreeMap's Bright vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-positron",
+      "label": "OpenFreeMap Positron",
+      "help": "OpenFreeMap's light Positron vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-dark",
+      "label": "OpenFreeMap Dark",
+      "help": "OpenFreeMap's dark vector style.",
+      "icon": "dark",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-fiord",
+      "label": "OpenFreeMap Fiord",
+      "help": "OpenFreeMap's blue-grey Fiord vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "openfreemap-tiles",
+      "label": "OpenFreeMap Tiles (RustGIS Style)",
+      "help": "OpenFreeMap's vector tiles in RustGIS's own built-in style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "versatiles-colorful",
+      "label": "VersaTiles Colorful",
+      "help": "VersaTiles' colourful vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "versatiles-eclipse",
+      "label": "VersaTiles Eclipse",
+      "help": "VersaTiles' dark vector style.",
+      "icon": "dark",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "versatiles-graybeard",
+      "label": "VersaTiles Graybeard",
+      "help": "VersaTiles' grey vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "versatiles-shadow",
+      "label": "VersaTiles Shadow",
+      "help": "VersaTiles' dark grey vector style.",
+      "icon": "dark",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "versatiles-neutrino",
+      "label": "VersaTiles Neutrino",
+      "help": "VersaTiles' muted vector style.",
+      "icon": "web_map",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "esri-places",
+      "label": "Esri Boundaries and Places",
+      "help": "Esri's boundaries and place names, for imagery. An overlay: choose it again to remove it.",
+      "icon": "label"
+    },
+    {
+      "id": "esri-gray-reference",
+      "label": "Esri Light Gray Reference",
+      "help": "The labels of Esri's light grey canvas. An overlay: choose it again to remove it.",
+      "icon": "label"
+    },
+    {
+      "id": "esri-ocean-reference",
+      "label": "Esri Ocean Reference",
+      "help": "Names of seas and undersea features. An overlay: choose it again to remove it.",
+      "icon": "label"
+    },
+    {
+      "id": "esri-transportation",
+      "label": "Esri Transportation",
+      "help": "Roads and railways, for imagery. An overlay: choose it again to remove it.",
+      "icon": "line_layer"
+    },
+    {
+      "id": "openrailwaymap",
+      "label": "OpenRailwayMap",
+      "help": "Railways from OpenStreetMap. An overlay: choose it again to remove it.",
+      "icon": "line_layer"
+    },
+    {
+      "id": "openseamap",
+      "label": "OpenSeaMap",
+      "help": "Sea marks: buoys, lights and harbours. An overlay: choose it again to remove it.",
+      "icon": "point_layer"
+    },
+    {
+      "id": "waymarked-hiking",
+      "label": "Hiking Trails",
+      "help": "Waymarked hiking routes from OpenStreetMap. An overlay: choose it again to remove it.",
+      "icon": "line_layer"
+    },
+    {
+      "id": "waymarked-cycling",
+      "label": "Cycling Routes",
+      "help": "Waymarked cycling routes from OpenStreetMap. An overlay: choose it again to remove it.",
+      "icon": "line_layer"
+    },
+    {
+      "id": "usgs-hydro",
+      "label": "USGS Hydrography",
+      "help": "The National Map's rivers, streams and water bodies (United States).",
+      "icon": "basemap",
+      "params": "{\"add\"?: bool (stack it over the current basemaps instead of replacing them)}"
+    },
+    {
+      "id": "clear",
+      "label": "Clear\nBasemaps",
+      "help": "Remove the web basemaps and go back to the built-in one. Overlays stay.",
+      "icon": "delete"
+    },
+    {
+      "id": "clear-overlays",
+      "label": "Clear\nOverlays",
+      "help": "Remove the overlays (labels, roads, trails).",
+      "icon": "clear_sel"
+    },
+    {
+      "id": "current",
+      "label": "Current",
+      "help": "Show the map's tile layers in the status bar.",
+      "icon": "stats"
+    }
+  ],
+  "tab": {
+    "label": "Basemaps",
+    "groups": [
+      {
+        "label": "Popular",
+        "items": [
+          "osm",
+          "esri-imagery",
+          "openfreemap-positron",
+          "openfreemap-liberty"
+        ]
+      },
+      {
+        "label": "Streets",
+        "items": [
+          {
+            "menu": "OpenStreetMap",
+            "icon": "basemap",
+            "help": "OpenStreetMap and maps made from it.",
+            "items": [
+              "osm",
+              "osm-hot",
+              "osm-de",
+              "osm-fr",
+              "cyclosm",
+              "opentopomap"
+            ]
+          },
+          {
+            "menu": "Esri",
+            "icon": "basemap",
+            "help": "Esri's street, topographic and canvas maps.",
+            "items": [
+              "esri-streets",
+              "esri-topo",
+              "esri-light-gray",
+              "esri-dark-gray",
+              "esri-natgeo",
+              "esri-ocean"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Imagery & Terrain",
+        "items": [
+          {
+            "menu": "Imagery",
+            "icon": "raster_layer",
+            "help": "Satellite and aerial imagery.",
+            "items": [
+              "esri-imagery",
+              "usgs-imagery",
+              "usgs-imagery-topo",
+              "nasa-blue-marble",
+              "nasa-night-lights"
+            ]
+          },
+          {
+            "menu": "Terrain",
+            "icon": "relief",
+            "help": "Topographic maps, relief and hillshade.",
+            "items": [
+              "opentopomap",
+              "usgs-topo",
+              "usgs-shaded-relief",
+              "esri-terrain",
+              "esri-shaded-relief",
+              "esri-physical",
+              "esri-hillshade",
+              "usgs-hydro"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Vector",
+        "items": [
+          {
+            "menu": "OpenFreeMap",
+            "icon": "web_map",
+            "help": "OpenFreeMap's vector maps of the world, drawn from vector tiles.",
+            "items": [
+              "openfreemap-liberty",
+              "openfreemap-bright",
+              "openfreemap-positron",
+              "openfreemap-dark",
+              "openfreemap-fiord",
+              "openfreemap-tiles"
+            ]
+          },
+          {
+            "menu": "VersaTiles",
+            "icon": "web_map",
+            "help": "VersaTiles' vector maps of the world.",
+            "items": [
+              "versatiles-colorful",
+              "versatiles-eclipse",
+              "versatiles-graybeard",
+              "versatiles-shadow",
+              "versatiles-neutrino"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Overlays",
+        "items": [
+          {
+            "menu": "Labels",
+            "icon": "label",
+            "help": "Place names over any basemap. Choose one again to remove it.",
+            "items": [
+              "esri-places",
+              "esri-gray-reference",
+              "esri-ocean-reference"
+            ]
+          },
+          {
+            "menu": "Lines",
+            "icon": "line_layer",
+            "help": "Roads, railways, trails and waterways over any basemap. Choose one again to remove it.",
+            "items": [
+              "esri-transportation",
+              "openrailwaymap",
+              "waymarked-hiking",
+              "waymarked-cycling",
+              "openseamap"
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Manage",
+        "items": [
+          "clear",
+          "clear-overlays",
+          "current"
+        ]
+      }
+    ]
+  },
+  "i18n": {
+    "de": {
+      "Basemaps": "Grundkarten",
+      "Popular": "Beliebt",
+      "Streets": "Straßen",
+      "Imagery & Terrain": "Bilder & Gelände",
+      "Vector": "Vektor",
+      "Overlays": "Überlagerungen",
+      "Manage": "Verwalten",
+      "Imagery": "Luftbilder",
+      "Terrain": "Gelände",
+      "Labels": "Beschriftungen",
+      "Lines": "Linien",
+      "Clear\nBasemaps": "Grundkarten\nentfernen",
+      "Clear\nOverlays": "Überlagerungen\nentfernen",
+      "Current": "Aktuell",
+      "Hiking Trails": "Wanderwege",
+      "Cycling Routes": "Radrouten",
+      "OSM Germany": "OSM Deutschland",
+      "OSM France": "OSM Frankreich",
+      "OSM Humanitarian": "OSM Humanitär",
+      "NASA Earth at Night": "NASA Erde bei Nacht"
+    },
+    "zh-CN": {
+      "Basemaps": "底图",
+      "Popular": "常用",
+      "Streets": "街道",
+      "Imagery & Terrain": "影像与地形",
+      "Vector": "矢量",
+      "Overlays": "叠加层",
+      "Manage": "管理",
+      "Imagery": "影像",
+      "Terrain": "地形",
+      "Labels": "注记",
+      "Lines": "线状要素",
+      "Clear\nBasemaps": "清除\n底图",
+      "Clear\nOverlays": "清除\n叠加层",
+      "Current": "当前",
+      "Hiking Trails": "徒步路线",
+      "Cycling Routes": "骑行路线",
+      "OSM Germany": "OSM 德国",
+      "OSM France": "OSM 法国",
+      "OSM Humanitarian": "OSM 人道主义",
+      "NASA Earth at Night": "NASA 夜间地球",
+      "OpenStreetMap": "OpenStreetMap"
+    }
+  }
+}
