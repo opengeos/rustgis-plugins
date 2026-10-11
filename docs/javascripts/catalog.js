@@ -148,6 +148,8 @@
       });
     registry.then(
       (data) => {
+        // Left before the list arrived (instant navigation): nothing to fill.
+        if (!catalog.isConnected) return;
         const plugins = (Array.isArray(data && data.plugins) ? data.plugins : []).filter((p) => p && typeof p.id === "string" && p.id);
         // Searchable text, made once.
         const text = plugins.map((p) =>
@@ -187,7 +189,9 @@
         // Batches until the end of the list is out of reach (a tall or zoomed-out window can
         // show more than one batch, and the observer only calls back when that changes).
         function topUp() {
-          while (rendered < shown.length && more.getBoundingClientRect().top < innerHeight + 800) fill();
+          // Not for a page that's gone (a detached marker measures at the top, so this would
+          // otherwise build every card).
+          while (more.isConnected && rendered < shown.length && more.getBoundingClientRect().top < innerHeight + 800) fill();
         }
 
         function apply() {
