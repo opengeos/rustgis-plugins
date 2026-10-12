@@ -15,6 +15,10 @@ the interface language when the plugin's `i18n` has it, and in English otherwise
 `insert` adds to the existing tables (a language already stored with a region, such as
 `zh-CN`, keeps its key), never overwrites a translation, and rewrites only the `i18n` block of
 `plugin.json`, so the rest of the file keeps its layout.
+
+Code messages are found only as a string literal passed straight to `tr`: a message built with
+`concat!`, held in a `const`, or passed through a variable isn't seen, so `audit` can't vouch
+for it.
 """
 
 from __future__ import annotations
@@ -34,6 +38,23 @@ LANGS = ["de", "es", "fr", "it", "nl", "pt", "ru", "tr", "az", "id", "vi", "zh",
 # `req.tr(MANIFEST, "...")` in a plugin's source: the message is the first string literal.
 TR_RE = re.compile(r'\.tr\(\s*[A-Za-z_][A-Za-z0-9_:]*\s*,\s*"((?:[^"\\]|\\.)*)"')
 PLACEHOLDER_RE = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
+
+
+def placeholders(s: str) -> tuple[list[str], int, int]:
+    """A string's `{name}` placeholders, and the braces left outside them.
+
+    The SDK fills `{name}` wherever it appears, so `{{name}}` would render as `{value}`: counting
+    the stray braces makes a translation that wraps a placeholder in extra braces differ from
+    the English.
+
+    Args:
+        s: An English string or a translation.
+
+    Returns:
+        The placeholders, sorted, and the counts of the other `{` and `}`.
+    """
+    rest = PLACEHOLDER_RE.sub("", s)
+    return sorted(PLACEHOLDER_RE.findall(s)), rest.count("{"), rest.count("}")
 
 
 def manifests() -> list[Path]:
@@ -107,7 +128,10 @@ def table_for(i18n: dict, lang: str) -> dict | None:
 
 
 def audit(verbose: bool) -> tuple[int, int]:
-    """Prints each plugin's coverage per language.
+    """Prints each plugin's coverage per language, and the translations that lose placeholders.
+
+    Coverage counts the table RustGIS picks for each interface language; placeholders are
+    checked in every stored table, so a regional one (`zh-CN` beside `zh`) can't hide a mistake.
 
     Args:
         verbose: Also list the missing strings and placeholder problems.
@@ -124,15 +148,19 @@ def audit(verbose: bool) -> tuple[int, int]:
         for lang in LANGS:
             table = table_for(i18n, lang) or {}
             missing = [k for k in keys if not str(table.get(k, "")).strip()]
-            bad = [k for k in keys if k in table and sorted(PLACEHOLDER_RE.findall(k)) != sorted(PLACEHOLDER_RE.findall(table[k]))]
             done = len(keys) - len(missing)
-            print(f"  {lang:3} {100 * done // max(len(keys), 1):3}%  missing {len(missing):3}  placeholder {len(bad)}")
+            print(f"  {lang:5} {100 * done // max(len(keys), 1):3}%  missing {len(missing):3}")
             if verbose:
                 for k in missing:
                     print(f"        missing: {k!r}")
-                for k in bad:
-                    print(f"        placeholder: {k!r} -> {table[k]!r}")
             missing_n += len(missing)
+        for lang, table in sorted(i18n.items()):
+            bad = [k for k in keys if k in table and placeholders(k) != placeholders(str(table[k]))]
+            if bad:
+                print(f"  {lang:5} placeholder {len(bad)}")
+                if verbose:
+                    for k in bad:
+                        print(f"        placeholder: {k!r} -> {table[k]!r}")
             bad_n += len(bad)
     return missing_n, bad_n
 
@@ -166,15 +194,15 @@ def write_i18n(path: Path, i18n: dict) -> None:
     text = path.read_text(encoding="utf-8")
     block = json.dumps(i18n, ensure_ascii=False, indent=2).replace("\n", "\n  ")
     m = json.loads(text)
+    want = {**m, "i18n": i18n}
     start = text.rfind('"i18n"')
-    if list(m)[-1:] == ["i18n"] and start != -1:
-        text = text[:start] + f'"i18n": {block}\n}}\n'
-    else:
-        m["i18n"] = i18n
-        text = json.dumps(m, ensure_ascii=False, indent=2) + "\n"
-    if json.loads(text) != {**m, "i18n": i18n}:
-        sys.exit(f"{path}: rewriting the i18n block changed something else; nothing written")
-    path.write_text(text, encoding="utf-8")
+    out = text[:start] + f'"i18n": {block}\n}}\n' if list(m)[-1:] == ["i18n"] and start != -1 else ""
+    try:
+        kept = json.loads(out) == want
+    except json.JSONDecodeError:
+        kept = False
+    # The search for the block can land on the wrong `"i18n"`; then rewrite the whole file.
+    path.write_text(out if kept else json.dumps(want, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def insert(src: Path) -> None:
@@ -198,7 +226,7 @@ def insert(src: Path) -> None:
             for en, tr in entries.items():
                 if en not in keys or not str(tr).strip() or str(table.get(en, "")).strip():
                     continue
-                if sorted(PLACEHOLDER_RE.findall(en)) != sorted(PLACEHOLDER_RE.findall(tr)):
+                if placeholders(en) != placeholders(str(tr)):
                     print(f"{m['id']} {lang}: skipped (placeholders differ): {en!r} -> {tr!r}")
                     continue
                 table[en] = tr

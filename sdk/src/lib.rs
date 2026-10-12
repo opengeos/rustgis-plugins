@@ -102,7 +102,10 @@ impl Request {
 
     /// `s` in the interface language, from the `i18n` table of the plugin's `plugin.json`
     /// (`manifest` is its text: `include_str!("../plugin.json")`), with each `{name}` placeholder
-    /// filled from `args`. A string with no translation stays in English.
+    /// filled from `args`. A string with no translation stays in English, as does every string
+    /// when the manifest isn't valid JSON.
+    ///
+    /// Each call parses the manifest, so in a loop translate the message once, outside it.
     ///
     /// ```ignore
     /// const MANIFEST: &str = include_str!("../plugin.json");

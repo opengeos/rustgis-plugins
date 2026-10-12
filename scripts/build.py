@@ -76,7 +76,6 @@ ZIP_TIME = (2026, 1, 1, 0, 0, 0)
 problems: list[str] = []
 
 
-
 def listing_i18n(manifest: dict) -> dict:
     """The translations of a plugin's name and description, for its registry entry.
 
@@ -99,6 +98,7 @@ def listing_i18n(manifest: dict) -> dict:
         if keep:
             out[lang] = keep
     return out
+
 
 def problem(msg: str) -> None:
     problems.append(msg)

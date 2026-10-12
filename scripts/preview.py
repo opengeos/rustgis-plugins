@@ -71,7 +71,6 @@ def make(dist: Path, out: Path) -> int:
     return 0
 
 
-
 def listing_i18n(manifest: dict) -> dict:
     """The translations of a plugin's name and description, for its registry entry.
 
@@ -94,6 +93,7 @@ def listing_i18n(manifest: dict) -> dict:
         if keep:
             out[lang] = keep
     return out
+
 
 def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
     """The registry entry build.py writes for a package with this manifest.
