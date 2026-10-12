@@ -71,6 +71,30 @@ def make(dist: Path, out: Path) -> int:
     return 0
 
 
+
+def listing_i18n(manifest: dict) -> dict:
+    """The translations of a plugin's name and description, for its registry entry.
+
+    The Plugin Manager lists plugins in the interface language before they're installed, so
+    the entry carries these two strings from the manifest's `i18n`. Keep it in step with
+    `build.py`'s copy: CI checks the two scripts build the same entry.
+
+    Args:
+        manifest: The package's plugin.json.
+
+    Returns:
+        `{lang: {english: translation}}` for the languages that translate either string.
+    """
+    tables = manifest.get("i18n")
+    out: dict = {}
+    for lang, table in sorted(tables.items()) if isinstance(tables, dict) else []:
+        if not isinstance(table, dict):
+            continue
+        keep = {k: v for k in (manifest.get("name"), manifest.get("description")) if isinstance(k, str) and isinstance(v := table.get(k), str) and v.strip()}
+        if keep:
+            out[lang] = keep
+    return out
+
 def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
     """The registry entry build.py writes for a package with this manifest.
 
@@ -103,6 +127,7 @@ def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
         "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", []) if isinstance(c, dict)],
         "tools": [t.get("name", "") for t in manifest.get("tools", []) if isinstance(t, dict)],
         "tab": tab.get("label", "") if isinstance(tab := manifest.get("tab") or {}, dict) else "",
+        "i18n": listing_i18n(manifest),
     }
 
 

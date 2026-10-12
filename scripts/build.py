@@ -76,6 +76,30 @@ ZIP_TIME = (2026, 1, 1, 0, 0, 0)
 problems: list[str] = []
 
 
+
+def listing_i18n(manifest: dict) -> dict:
+    """The translations of a plugin's name and description, for its registry entry.
+
+    The Plugin Manager lists plugins in the interface language before they're installed, so
+    the entry carries these two strings from the manifest's `i18n`. Keep it in step with
+    `preview.py`'s copy: CI checks the two scripts build the same entry.
+
+    Args:
+        manifest: The package's plugin.json.
+
+    Returns:
+        `{lang: {english: translation}}` for the languages that translate either string.
+    """
+    tables = manifest.get("i18n")
+    out: dict = {}
+    for lang, table in sorted(tables.items()) if isinstance(tables, dict) else []:
+        if not isinstance(table, dict):
+            continue
+        keep = {k: v for k in (manifest.get("name"), manifest.get("description")) if isinstance(k, str) and isinstance(v := table.get(k), str) and v.strip()}
+        if keep:
+            out[lang] = keep
+    return out
+
 def problem(msg: str) -> None:
     problems.append(msg)
     print(f"error: {msg}", file=sys.stderr)
@@ -630,6 +654,7 @@ def main() -> int:
                 "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", [])],
                 "tools": [t.get("name", "") for t in manifest.get("tools", [])],
                 "tab": (manifest.get("tab") or {}).get("label", ""),
+                "i18n": listing_i18n(manifest),
             }
         )
     print(f"{len(new)} new packages, {len(entries) - len(new)} already published")

@@ -82,7 +82,7 @@ To try it while you work, load the folder instead of a package. In RustGIS, use
       ]
     }
   ],
-  "i18n": { "de": { "Layer\nReport": "Ebenen-\nbericht" } }
+  "i18n": { "de": { "Layer\nReport": "Layer-\nbericht" } }
 }
 ```
 
@@ -98,11 +98,40 @@ To try it while you work, load the folder instead of a package. In RustGIS, use
   `buffer`…), or a puzzle piece when it isn't one.
 - Tool parameter `kind`s: `layer`, `vectorLayer`, `polygonLayer`, `pointLayer`, `field`,
   `numericField`, `number`, `text`, `choice` (with `choices`) and `bool`.
-- `i18n` translates the plugin's own labels, help, names and summaries into the interface
-  language, by language code (`de`, or `zh-CN` with a fallback to `zh`).
+- `i18n` translates the plugin's own text into the interface language, by language code. See
+  [Translations](#translations).
 
 A package is a zip archive named `<id>-<version>.rgplugin`. It holds `plugin.json` and the module
 at its root, or inside one top-level folder. Packages are at most 64 MB, and modules at most 48 MB.
+
+## Translations
+
+RustGIS shows a plugin in the interface language when its `plugin.json` has an `i18n` table: for
+each language code, the plugin's English strings (exactly as written, `\n` included) and their
+translations. A string with no translation shows in English, so translations are optional.
+
+- They cover the name and description (in the Plugin Manager, before the plugin is installed
+  too), command labels and help, tool names, summaries and toolboxes, parameter labels and
+  `choice` values, and the tab, group and menu labels.
+- RustGIS's interface languages are `de`, `es`, `fr`, `it`, `nl`, `pt`, `ru`, `tr`, `az`, `id`,
+  `vi`, `zh`, `ja` and `ko`. A code with a region matches its language: `zh-CN` serves `zh`.
+- Messages the plugin builds while it runs: every request carries the interface language
+  (`req.lang`), and `req.tr` looks a message up in the same table and fills its `{placeholders}`:
+
+  ```rust
+  const MANIFEST: &str = include_str!("../plugin.json");
+
+  host::notify(&req.tr(MANIFEST, "Zoomed to {name}.", &[("name", &layer)]));
+  ```
+
+  Add `"Zoomed to {name}."` to the `i18n` tables like any other string. Layer and field names
+  are data: leave them in English.
+- `python scripts/i18n.py audit -v` lists what each plugin is missing per language (CI runs it
+  and fails on a translation that drops a `{placeholder}`). `missing -o todo.json` writes the
+  gaps to fill in, and `insert todo.json` adds them to the manifests.
+
+[Hello RustGIS](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/hello) translates
+its messages this way.
 
 ## A tab of its own
 

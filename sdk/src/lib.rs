@@ -26,6 +26,40 @@
 //! `docs/plugins.md`; this crate hides it.
 pub use serde_json::{self, Map, Value, json};
 
+/// `s` from `i18n` (translations by language code): the exact code first, then the language
+/// without its region, then any region of it (`zh` finds `zh-CN`), as RustGIS looks them up.
+fn translation<'a>(i18n: &'a Map<String, Value>, lang: &str, s: &str) -> Option<&'a str> {
+    let base_of = |l: &str| l.split(['-', '_']).next().unwrap_or(l).to_ascii_lowercase();
+    let base = base_of(lang);
+    let pick = |want: &dyn Fn(&str) -> bool| {
+        i18n.iter().filter(|(k, _)| want(k)).find_map(|(_, t)| t.get(s).and_then(Value::as_str)).filter(|t| !t.is_empty())
+    };
+    pick(&|k| k.eq_ignore_ascii_case(lang)).or_else(|| pick(&|k| k.eq_ignore_ascii_case(&base))).or_else(|| pick(&|k| base_of(k) == base))
+}
+
+/// `template` with each `{name}` replaced by its value in `args`, in one pass (a value is never
+/// read again as a template).
+fn fill(template: &str, args: &[(&str, &str)]) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        match after.find('}').and_then(|close| args.iter().find(|(k, _)| *k == &after[..close]).map(|(_, v)| (close, v))) {
+            Some((close, v)) => {
+                out.push_str(v);
+                rest = &after[close + 1..];
+            }
+            None => {
+                out.push('{');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The plugin ABI this SDK speaks. `plugin.json`'s `abi` must match it.
 pub const ABI: u32 = 1;
 
@@ -49,6 +83,8 @@ pub struct Request {
     /// For tools: each layer parameter's features as a GeoJSON FeatureCollection, by layer
     /// name (only the selected features when the layer has a selection).
     pub layers: Map<String, Value>,
+    /// The interface language's code (`en`, `de`, `zh`…): word messages in it with [`Request::tr`].
+    pub lang: String,
 }
 
 impl Request {
@@ -59,7 +95,23 @@ impl Request {
             id: v.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
             params: v.get("params").cloned().unwrap_or(Value::Null),
             layers: v.get("layers").and_then(Value::as_object).cloned().unwrap_or_default(),
+            // RustGIS older than the `lang` field speaks English.
+            lang: v.get("lang").and_then(Value::as_str).unwrap_or("en").to_string(),
         }
+    }
+
+    /// `s` in the interface language, from the `i18n` table of the plugin's `plugin.json`
+    /// (`manifest` is its text: `include_str!("../plugin.json")`), with each `{name}` placeholder
+    /// filled from `args`. A string with no translation stays in English.
+    ///
+    /// ```ignore
+    /// const MANIFEST: &str = include_str!("../plugin.json");
+    /// host::notify(&req.tr(MANIFEST, "Zoomed to {name}.", &[("name", &layer)]));
+    /// ```
+    pub fn tr(&self, manifest: &str, s: &str, args: &[(&str, &str)]) -> String {
+        let manifest: Value = serde_json::from_str(manifest).unwrap_or(Value::Null);
+        let text = manifest.get("i18n").and_then(Value::as_object).and_then(|t| translation(t, &self.lang, s)).unwrap_or(s);
+        fill(text, args)
     }
 
     /// A text parameter.
@@ -327,4 +379,29 @@ macro_rules! export {
             $crate::abi::call(ptr, len, $handler)
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MANIFEST: &str =
+        r#"{"i18n": {"de": {"Zoomed to {name}.": "Auf {name} gezoomt."}, "zh-CN": {"Zoomed to {name}.": "已缩放至 {name}。"}}}"#;
+
+    fn request(lang: Option<&str>) -> Request {
+        let mut v = json!({"abi": ABI, "kind": "command", "id": "z", "params": {}});
+        if let Some(l) = lang {
+            v["lang"] = json!(l);
+        }
+        Request::parse(v)
+    }
+
+    #[test]
+    fn messages_follow_the_interface_language() {
+        assert_eq!(request(None).lang, "en");
+        assert_eq!(request(Some("de")).tr(MANIFEST, "Zoomed to {name}.", &[("name", "Cities")]), "Auf Cities gezoomt.");
+        assert_eq!(request(Some("zh")).tr(MANIFEST, "Zoomed to {name}.", &[("name", "Cities")]), "已缩放至 Cities。");
+        assert_eq!(request(Some("fr")).tr(MANIFEST, "Zoomed to {name}.", &[("name", "{name}")]), "Zoomed to {name}.");
+        assert_eq!(request(Some("de")).tr("not json", "Hi {x", &[("x", "y")]), "Hi {x");
+    }
 }

@@ -46,6 +46,9 @@ jobs:
       # from packages.rustgis.app.
       - name: Build, package and check the plugins that changed
         run: python scripts/build.py --check
+      # Coverage per plugin and language; fails on a translation that drops a {placeholder}.
+      - name: Check the translations
+        run: python scripts/i18n.py audit
       # The pull request's packages, for plugin-preview.yml to publish (it holds the secrets and
       # runs none of this code). Before the smoke test, so a failing plugin can still be tried.
       - name: Make the preview
