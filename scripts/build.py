@@ -59,7 +59,8 @@ ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
-PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool"}
+PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
+EXTENSION_RE = re.compile(r"[A-Za-z0-9]{1,16}")
 CATEGORIES = {
     "Analysis", "Basemaps", "Cartography", "Data", "Editing", "Example", "Hydrology", "Imagery",
     "Raster", "Sampling", "Terrain", "Utilities", "Vector", "Visualization",
@@ -204,6 +205,12 @@ def check_manifest(m: dict, where: str) -> None:
         for p in t.get("params", []):
             if p.get("kind") not in PARAM_KINDS:
                 problem(f"{where}: tool {t.get('id')}: parameter {p.get('name')!r} has unknown kind {p.get('kind')!r}")
+            # RustGIS hands a tool a file only with `files`, and filters its picker by plain extensions.
+            if p.get("kind") == "file" and "files" not in m.get("permissions", []):
+                problem(f"{where}: tool {t.get('id')}: file parameter {p.get('name')!r} needs the 'files' permission")
+            exts = p.get("extensions", [])
+            if not isinstance(exts, list) or len(exts) > 16 or not all(isinstance(e, str) and EXTENSION_RE.fullmatch(e) for e in exts):
+                problem(f"{where}: tool {t.get('id')}: parameter {p.get('name')!r} has invalid extensions (letters and digits, no dot)")
 
 
 def check_tab(m: dict, where: str) -> None:

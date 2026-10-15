@@ -83,18 +83,28 @@ pub struct Request {
     /// For tools: each layer parameter's features as a GeoJSON FeatureCollection, by layer
     /// name (only the selected features when the layer has a selection).
     pub layers: Map<String, Value>,
+    /// For tools: each `file` parameter's file, `{"name", "data"}` with the contents in base64,
+    /// by parameter name. Read one with [`Request::file`].
+    pub files: Map<String, Value>,
     /// The interface language's code (`en`, `de`, `zh`…): word messages in it with [`Request::tr`].
     pub lang: String,
 }
 
 impl Request {
-    fn parse(v: Value) -> Request {
+    fn parse(mut v: Value) -> Request {
         let kind = if v.get("kind").and_then(Value::as_str) == Some("tool") { Kind::Tool } else { Kind::Command };
+        // Taken, not copied: layers and files can be large, and the module has 512 MB.
+        let mut take_map = |key: &str| match v.get_mut(key).map(Value::take) {
+            Some(Value::Object(m)) => m,
+            _ => Map::new(),
+        };
+        let (layers, files) = (take_map("layers"), take_map("files"));
         Request {
             kind,
             id: v.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
-            params: v.get("params").cloned().unwrap_or(Value::Null),
-            layers: v.get("layers").and_then(Value::as_object).cloned().unwrap_or_default(),
+            params: v.get_mut("params").map(Value::take).unwrap_or(Value::Null),
+            layers,
+            files,
             // RustGIS older than the `lang` field speaks English.
             lang: v.get("lang").and_then(Value::as_str).unwrap_or("en").to_string(),
         }
@@ -144,6 +154,75 @@ impl Request {
     pub fn features(&self, param: &str) -> Result<&[Value], String> {
         Ok(self.layer(param)?.get("features").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]))
     }
+
+    /// The file a tool's `file` parameter names: its name and contents. The parameter is
+    /// declared with `"kind": "file"` in `plugin.json`, which needs the `files` permission.
+    ///
+    /// Each call decodes the file again, so call it once per file.
+    ///
+    /// ```ignore
+    /// let model = req.file("model")?;
+    /// let ds = terrio::memory::open_raster_bytes(model.bytes, &model.name).map_err(|e| e.to_string())?;
+    /// ```
+    pub fn file(&self, param: &str) -> Result<File, String> {
+        let f = match self.files.get(param) {
+            Some(f) => f,
+            // A file named but not sent: a RustGIS older than file parameters.
+            None if self.str(param).is_some_and(|s| !s.is_empty()) => {
+                return Err(format!("'{param}': this RustGIS doesn't hand plugins files; update RustGIS"));
+            }
+            None => return Err(format!("'{param}' is required")),
+        };
+        let name = f.get("name").and_then(Value::as_str).unwrap_or("file").to_string();
+        let data = f.get("data").and_then(Value::as_str).ok_or_else(|| format!("'{param}': the file has no contents"))?;
+        let bytes = base64_decode(data).ok_or_else(|| format!("'{param}': the file's contents aren't base64"))?;
+        Ok(File { name, bytes })
+    }
+}
+
+/// A file a tool's `file` parameter named.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct File {
+    /// Its name, without the folder (`run.nc`).
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+/// Decodes standard, padded base64; `None` for anything else.
+fn base64_decode(s: &str) -> Option<Vec<u8>> {
+    fn value(c: u8) -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        } as u32)
+    }
+    let b = s.as_bytes();
+    if !b.len().is_multiple_of(4) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(b.len() / 4 * 3);
+    let (chunks, _) = b.as_chunks::<4>();
+    let last = chunks.len().saturating_sub(1);
+    for (i, c) in chunks.iter().enumerate() {
+        // Padding only at the very end: `xx==` or `xxx=`.
+        let pad = match c {
+            [_, _, b'=', b'='] if i == last => 2,
+            [_, _, _, b'='] if i == last => 1,
+            _ => 0,
+        };
+        let mut n = 0u32;
+        for &x in &c[..4 - pad] {
+            n = (n << 6) | value(x)?;
+        }
+        n <<= 6 * pad as u32;
+        let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+        out.extend_from_slice(&bytes[..3 - pad]);
+    }
+    Some(out)
 }
 
 /// What a tool returns: new layers and tables, or a selection, and messages for the
@@ -353,7 +432,10 @@ pub mod abi {
         let len = usize::try_from(len).unwrap_or(0);
         // SAFETY: RustGIS wrote `len` bytes at `ptr`, a buffer `alloc` made with that capacity.
         let bytes = unsafe { Vec::from_raw_parts(ptr as *mut u8, len, len) };
-        let reply = match serde_json::from_slice::<Value>(&bytes) {
+        let parsed = serde_json::from_slice::<Value>(&bytes);
+        // The request's text isn't needed once it's parsed: room for the handler.
+        drop(bytes);
+        let reply = match parsed {
             Ok(v) => match handler(Request::parse(v)) {
                 Ok(v) => json!({"ok": v}),
                 Err(e) => json!({"error": e}),
@@ -397,6 +479,28 @@ mod tests {
             v["lang"] = json!(l);
         }
         Request::parse(v)
+    }
+
+    #[test]
+    fn tools_read_their_files() {
+        let req =
+            |files: Value, params: Value| Request::parse(json!({"abi": ABI, "kind": "tool", "id": "t", "params": params, "files": files}));
+        let r = req(json!({"model": {"name": "run.nc", "data": "Q0RGAQ=="}}), json!({"model": "run.nc"}));
+        assert_eq!(r.file("model"), Ok(File { name: "run.nc".into(), bytes: b"CDF\x01".to_vec() }));
+        assert!(r.file("other").unwrap_err().contains("required"));
+        // Named but not sent: an older RustGIS.
+        assert!(req(json!(null), json!({"model": "run.nc"})).file("model").unwrap_err().contains("update RustGIS"));
+        for bad in [json!({"name": "a"}), json!({"data": 7}), json!({"data": "abc"}), json!({"data": "a=bc"}), json!({"data": "QQ==QQ=="})]
+        {
+            assert!(req(json!({"model": bad}), json!({})).file("model").is_err(), "{bad}");
+        }
+        // Every length decodes, padding included.
+        for (b64, plain) in
+            [("", ""), ("Zg==", "f"), ("Zm8=", "fo"), ("Zm9v", "foo"), ("Zm9vYg==", "foob"), ("Zm9vYmE=", "fooba"), ("Zm9vYmFy", "foobar")]
+        {
+            assert_eq!(base64_decode(b64).as_deref(), Some(plain.as_bytes()), "{b64}");
+        }
+        assert_eq!(base64_decode("+/+/").unwrap(), vec![0xfb, 0xff, 0xbf]);
     }
 
     #[test]

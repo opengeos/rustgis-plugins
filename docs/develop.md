@@ -97,12 +97,35 @@ To try it while you work, load the folder instead of a package. In RustGIS, use
 - `commands[].icon`: the name of one of RustGIS's own icons (`stats`, `zoom_full`, `bookmark`,
   `buffer`…), or a puzzle piece when it isn't one.
 - Tool parameter `kind`s: `layer`, `vectorLayer`, `polygonLayer`, `pointLayer`, `field`,
-  `numericField`, `number`, `text`, `choice` (with `choices`) and `bool`.
+  `numericField`, `number`, `text`, `choice` (with `choices`), `bool` and `file` (see
+  [File parameters](#file-parameters)).
 - `i18n` translates the plugin's own text into the interface language, by language code. See
   [Translations](#translations).
 
 A package is a zip archive named `<id>-<version>.rgplugin`. It holds `plugin.json` and the module
 at its root, or inside one top-level folder. Packages are at most 64 MB, and modules at most 48 MB.
+
+## File parameters
+
+A tool can read a file the user picks, such as a NetCDF model run or a GeoTIFF, with a `file`
+parameter. It needs the `files` permission, and a RustGIS with file parameters (set
+`minRustgisVersion` to the first release that has them):
+
+```json
+{ "name": "model", "label": "Model output", "kind": "file", "required": true, "extensions": ["nc", "nc4"] }
+```
+
+`extensions` (no dot, up to 16) filters the file picker; leave it out for any file. RustGIS reads
+the file, up to 64 MB, and the tool gets it with `req.file`:
+
+```rust
+let model = req.file("model")?; // model.name ("run.nc") and model.bytes
+```
+
+To read raster and vector formats from the bytes inside the module, use a pure-Rust library that
+builds for `wasm32-unknown-unknown`, such as [terrio](https://github.com/opengeos/terrio)
+(`terrio::memory::open_raster_bytes(model.bytes, &model.name)`). A 64 MB file, its copy in the
+request and what you make of it all share the module's 512 MB of memory.
 
 ## Translations
 
@@ -185,7 +208,7 @@ Inside a request, `host::call(op, params)` sends one of these to RustGIS:
 `rustgis-cli commands` lists every command id and its parameters.
 
 Tools work differently. A tool receives its layer parameters' features as GeoJSON (only the
-selected features when a layer has a selection). It returns new layers, standalone tables or a
+selected features when a layer has a selection), and its `file` parameters' files. It returns new layers, standalone tables or a
 selection, plus messages for the Geoprocessing history. RustGIS adds the results as it does for
 built-in tools, with undo. Tools can log, but they make no host requests.
 
@@ -210,7 +233,9 @@ The module exports:
   `reply_ptr << 32 | reply_len`. The reply is `{"ok": value}` or `{"error": "text"}`.
 
 Requests are `{"abi": 1, "kind": "command" | "tool", "id": "...", "params": {...}, "layers": {...}}`.
-Tools also get `layers`, which maps each layer's name to its FeatureCollection. A tool's `ok`
+Tools also get `layers`, which maps each layer's name to its FeatureCollection, and, when they
+have `file` parameters, `files`, which maps each one's name to `{"name", "data"}` with the file's
+contents in base64. A tool's `ok`
 value is `{"layers": [{"name", "geojson"}], "tables": [...], "selection": {"layer", "rows"},
 "messages": [...]}`.
 
