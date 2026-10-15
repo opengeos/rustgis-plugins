@@ -117,7 +117,7 @@ parameter. It needs the `files` permission, and a RustGIS with file parameters (
 
 `extensions` filters the file picker: at most 16, each 1 to 16 letters or digits, without the
 dot. Leave it out for any file. RustGIS reads the file, up to 64 MB, and the tool gets it with
-`req.take_file` (which frees the request's copy) or `req.file`:
+`req.take_file` (which decodes it in place, without a second copy) or `req.file`:
 
 ```rust
 // In `fn handle(mut req: Request)`:

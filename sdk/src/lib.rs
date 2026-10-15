@@ -164,20 +164,35 @@ impl Request {
         self.decode_file(param, self.files.get(param))
     }
 
-    /// Like [`Request::file`], but takes the file out of the request: its base64 text (a third
-    /// larger than the file) is freed once decoded.
+    /// Like [`Request::file`], but takes the file out of the request and decodes it in place,
+    /// in its base64 text's own memory: no second copy, at any point.
     ///
     /// ```ignore
     /// let model = req.take_file("model")?;
     /// let ds = terrio::memory::open_raster_bytes(model.bytes, &model.name).map_err(|e| e.to_string())?;
     /// ```
     pub fn take_file(&mut self, param: &str) -> Result<File, String> {
-        let f = self.files.remove(param);
-        self.decode_file(param, f.as_ref())
+        // Left behind, so a second take says what happened.
+        let taken = json!({"taken": true});
+        let Some(mut f) = self.files.insert(param.to_string(), taken) else {
+            self.files.remove(param);
+            return self.file(param);
+        };
+        if f.get("taken").is_some() {
+            return self.file(param);
+        }
+        let name = f.get("name").and_then(Value::as_str).unwrap_or("file").to_string();
+        let data = match f.get_mut("data").map(Value::take) {
+            Some(Value::String(data)) => data,
+            _ => return Err(format!("'{param}': the file has no contents")),
+        };
+        let bytes = base64_decode_in_place(data.into_bytes()).ok_or_else(|| format!("'{param}': the file's contents aren't base64"))?;
+        Ok(File { name, bytes })
     }
 
     fn decode_file(&self, param: &str, f: Option<&Value>) -> Result<File, String> {
         let f = match f {
+            Some(f) if f.get("taken").is_some() => return Err(format!("'{param}': the file was already taken (take_file)")),
             Some(f) => f,
             // A file named but not sent: a RustGIS older than file parameters.
             None if self.str(param).is_some_and(|s| !s.is_empty()) => {
@@ -202,6 +217,12 @@ pub struct File {
 
 /// Decodes standard, padded base64; `None` for anything else.
 fn base64_decode(s: &str) -> Option<Vec<u8>> {
+    base64_decode_in_place(s.as_bytes().to_vec())
+}
+
+/// Decodes standard, padded base64 in its own buffer: each 4 characters become at most 3 bytes,
+/// written behind what is still to be read.
+fn base64_decode_in_place(mut b: Vec<u8>) -> Option<Vec<u8>> {
     fn value(c: u8) -> Option<u32> {
         Some(match c {
             b'A'..=b'Z' => c - b'A',
@@ -212,18 +233,17 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
             _ => return None,
         } as u32)
     }
-    let b = s.as_bytes();
     if !b.len().is_multiple_of(4) {
         return None;
     }
-    let mut out = Vec::with_capacity(b.len() / 4 * 3);
-    let (chunks, _) = b.as_chunks::<4>();
-    let last = chunks.len().saturating_sub(1);
-    for (i, c) in chunks.iter().enumerate() {
+    let chunks = b.len() / 4;
+    let mut written = 0;
+    for i in 0..chunks {
+        let c = [b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]];
         // Padding only at the very end: `xx==` or `xxx=`.
         let pad = match c {
-            [_, _, b'=', b'='] if i == last => 2,
-            [_, _, _, b'='] if i == last => 1,
+            [_, _, b'=', b'='] if i + 1 == chunks => 2,
+            [_, _, _, b'='] if i + 1 == chunks => 1,
             _ => 0,
         };
         let mut n = 0u32;
@@ -232,9 +252,12 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
         }
         n <<= 6 * pad as u32;
         let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
-        out.extend_from_slice(&bytes[..3 - pad]);
+        b[written..written + 3 - pad].copy_from_slice(&bytes[..3 - pad]);
+        written += 3 - pad;
     }
-    Some(out)
+    b.truncate(written);
+    b.shrink_to_fit();
+    Some(b)
 }
 
 /// What a tool returns: new layers and tables, or a selection, and messages for the
@@ -501,9 +524,14 @@ mod tests {
         assert_eq!(r.file("model"), Ok(File { name: "run.nc".into(), bytes: b"CDF\x01".to_vec() }));
         // Taking it frees it: a second take finds it gone.
         let mut r = r;
-        assert_eq!(r.take_file("model").map(|f| f.bytes), Ok(b"CDF\x01".to_vec()));
-        assert!(r.files.is_empty());
-        assert!(r.take_file("model").unwrap_err().contains("update RustGIS"));
+        assert_eq!(r.take_file("model"), Ok(File { name: "run.nc".into(), bytes: b"CDF\x01".to_vec() }));
+        assert!(r.take_file("model").unwrap_err().contains("already taken"));
+        assert!(r.file("model").unwrap_err().contains("already taken"));
+        // Taken or not, the same errors.
+        assert!(r.take_file("other").unwrap_err().contains("required"));
+        assert!(r.files.get("other").is_none());
+        let mut bad = req(json!({"model": {"data": "a=bc"}}), json!({}));
+        assert!(bad.take_file("model").unwrap_err().contains("base64"));
         assert!(r.file("other").unwrap_err().contains("required"));
         // Named but not sent: an older RustGIS.
         assert!(req(json!(null), json!({"model": "run.nc"})).file("model").unwrap_err().contains("update RustGIS"));
