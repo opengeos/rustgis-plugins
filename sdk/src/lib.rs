@@ -158,14 +158,26 @@ impl Request {
     /// The file a tool's `file` parameter names: its name and contents. The parameter is
     /// declared with `"kind": "file"` in `plugin.json`, which needs the `files` permission.
     ///
-    /// Each call decodes the file again, so call it once per file.
+    /// The request keeps the file's base64 text, so [`Request::take_file`] uses less memory;
+    /// each call decodes the file again.
+    pub fn file(&self, param: &str) -> Result<File, String> {
+        self.decode_file(param, self.files.get(param))
+    }
+
+    /// Like [`Request::file`], but takes the file out of the request: its base64 text (a third
+    /// larger than the file) is freed once decoded.
     ///
     /// ```ignore
-    /// let model = req.file("model")?;
+    /// let model = req.take_file("model")?;
     /// let ds = terrio::memory::open_raster_bytes(model.bytes, &model.name).map_err(|e| e.to_string())?;
     /// ```
-    pub fn file(&self, param: &str) -> Result<File, String> {
-        let f = match self.files.get(param) {
+    pub fn take_file(&mut self, param: &str) -> Result<File, String> {
+        let f = self.files.remove(param);
+        self.decode_file(param, f.as_ref())
+    }
+
+    fn decode_file(&self, param: &str, f: Option<&Value>) -> Result<File, String> {
+        let f = match f {
             Some(f) => f,
             // A file named but not sent: a RustGIS older than file parameters.
             None if self.str(param).is_some_and(|s| !s.is_empty()) => {
@@ -487,6 +499,11 @@ mod tests {
             |files: Value, params: Value| Request::parse(json!({"abi": ABI, "kind": "tool", "id": "t", "params": params, "files": files}));
         let r = req(json!({"model": {"name": "run.nc", "data": "Q0RGAQ=="}}), json!({"model": "run.nc"}));
         assert_eq!(r.file("model"), Ok(File { name: "run.nc".into(), bytes: b"CDF\x01".to_vec() }));
+        // Taking it frees it: a second take finds it gone.
+        let mut r = r;
+        assert_eq!(r.take_file("model").map(|f| f.bytes), Ok(b"CDF\x01".to_vec()));
+        assert!(r.files.is_empty());
+        assert!(r.take_file("model").unwrap_err().contains("update RustGIS"));
         assert!(r.file("other").unwrap_err().contains("required"));
         // Named but not sent: an older RustGIS.
         assert!(req(json!(null), json!({"model": "run.nc"})).file("model").unwrap_err().contains("update RustGIS"));

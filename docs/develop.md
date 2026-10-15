@@ -115,11 +115,13 @@ parameter. It needs the `files` permission, and a RustGIS with file parameters (
 { "name": "model", "label": "Model output", "kind": "file", "required": true, "extensions": ["nc", "nc4"] }
 ```
 
-`extensions` (no dot, up to 16) filters the file picker; leave it out for any file. RustGIS reads
-the file, up to 64 MB, and the tool gets it with `req.file`:
+`extensions` filters the file picker: at most 16, each 1 to 16 letters or digits, without the
+dot. Leave it out for any file. RustGIS reads the file, up to 64 MB, and the tool gets it with
+`req.take_file` (which frees the request's copy) or `req.file`:
 
 ```rust
-let model = req.file("model")?; // model.name ("run.nc") and model.bytes
+// In `fn handle(mut req: Request)`:
+let model = req.take_file("model")?; // model.name ("run.nc") and model.bytes
 ```
 
 To read raster and vector formats from the bytes inside the module, use a pure-Rust library that
