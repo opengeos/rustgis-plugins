@@ -151,13 +151,14 @@ let out = host::run("layer.addUrl", json!({"url": url, "name": "Comuni", "zoom":
   them).
 - Cloud-optimised GeoTIFFs, PMTiles, and FlatGeobuf or GeoParquet files with a spatial index
   are read in place, by range, rather than downloaded whole.
-- In the desktop app and on the command line, the answer names the layers added. In the web
-  app, which downloads off the frame, it is `{"pending": true, "url": ...}` and the layer
+- The answer names the layers added. In the web app, a file that is downloaded whole is
+  downloaded off the frame: the answer is `{"pending": true, "url": ...}`, and the layer
   appears when the download lands. There the server must allow requests from other sites
   (CORS), as for **Add Data › From URL**.
 
-`layer.addData` opens files, not addresses. [IDE Chile](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/ide-chile)
-adds layers this way.
+`layer.addData` opens files, not addresses: use `layer.addUrl` for those.
+[IDE Chile](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/ide-chile) adds its
+layers with `layer.addUrl`.
 
 ## Translations
 
