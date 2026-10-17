@@ -41,11 +41,14 @@ import shutil
 import subprocess
 import sys
 import time
-import tomllib
 import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
+
+if sys.version_info < (3, 11):
+    sys.exit("scripts/build.py needs Python 3.11 or later (for tomllib)")
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 # Where packages are served (the R2 bucket's domain), and the previous deploy's package index.
