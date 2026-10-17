@@ -52,7 +52,7 @@ mkdir -p pkg && cp plugin.json pkg/ && cp target/wasm32-unknown-unknown/release/
 To try it while you work, load the folder instead of a package. In RustGIS, use
 **Plugins › Plugin Manager › Settings › Add Plugin Folder…**; on the command line, use
 `rustgis-cli run --plugin ./pkg --sample --cmd 'plugin:my-plugin/hello'`. Inside this repository,
-`python scripts/build.py` builds and packages every plugin into `dist/`, and
+`python scripts/build.py` (Python 3.11 or later) builds and packages every plugin into `dist/`, and
 `python scripts/smoke.py` runs them in RustGIS.
 
 ## `plugin.json`
@@ -91,14 +91,18 @@ To try it while you work, load the folder instead of a package. In RustGIS, use
 - `version` and `minRustgisVersion` look like `1.2.3`. RustGIS refuses a plugin that needs a
   newer RustGIS.
 - `permissions`: `edit`, `files` and `network` (see [Safety](index.md#safety)). Ask only for what
-  you use. `network` lets the plugin add web tile layers (`map.addTiles`), which the map loads
-  from the addresses the plugin gives; an address can carry data, so it is a permission of its
-  own.
+  you use. `network` lets the plugin have RustGIS fetch from addresses the plugin gives: web
+  tile layers (`map.addTiles`), data files (`layer.addUrl`, see
+  [Data from the web](#data-from-the-web)) and the commands that query web services. An address
+  can carry data, so it is a permission of its own.
 - `commands[].icon`: the name of one of RustGIS's own icons (`stats`, `zoom_full`, `bookmark`,
   `buffer`…), or a puzzle piece when it isn't one.
 - Tool parameter `kind`s: `layer`, `vectorLayer`, `polygonLayer`, `pointLayer`, `field`,
   `numericField`, `number`, `text`, `choice` (with `choices`), `bool` and `file` (see
   [File parameters](#file-parameters)).
+- Limits: at most 64 commands and 64 tools, 32 parameters per tool, and 1 to 64 `choices` per
+  `choice` parameter. For more values than that, use a `text` parameter and check it in the
+  plugin.
 - `i18n` translates the plugin's own text into the interface language, by language code. See
   [Translations](#translations).
 
@@ -128,6 +132,32 @@ To read raster and vector formats from the bytes inside the module, use a pure-R
 builds for `wasm32-unknown-unknown`, such as [terrio](https://github.com/opengeos/terrio)
 (`terrio::memory::open_raster_bytes(model.bytes, &model.name)`). A 64 MB file, its copy in the
 request and what you make of it all share the module's 512 MB of memory.
+
+## Data from the web
+
+The module itself has no network access, but a command can ask RustGIS to download a file and
+add it as layers with `layer.addUrl`. It needs the `network` and `edit` permissions, and RustGIS
+0.2.1 or later.
+
+```rust
+let url = format!("https://www.confini-amministrativi.it/api/v2/it/{date}/{level}.gpkg");
+let out = host::run("layer.addUrl", json!({"url": url, "name": "Comuni", "zoom": true}))?;
+```
+
+- The address is `http://`, `https://` or `s3://`. The format comes from its extension, else
+  from the contents: GeoJSON, CSV, GeoParquet, FlatGeobuf, GeoPackage, Shapefile or other data
+  in a `.zip`, KML, KMZ, GPX, GeoTIFF, or a PMTiles archive. `layer` picks one layer of a zip,
+  KML or GPX; the other parameters are those of `layer.addData` (`rustgis-cli commands` lists
+  them).
+- Cloud-optimised GeoTIFFs, PMTiles, and FlatGeobuf or GeoParquet files with a spatial index
+  are read in place, by range, rather than downloaded whole.
+- In the desktop app and on the command line, the answer names the layers added. In the web
+  app, which downloads off the frame, it is `{"pending": true, "url": ...}` and the layer
+  appears when the download lands. There the server must allow requests from other sites
+  (CORS), as for **Add Data › From URL**.
+
+`layer.addData` opens files, not addresses. [IDE Chile](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/ide-chile)
+adds layers this way.
 
 ## Translations
 
@@ -202,6 +232,7 @@ Inside a request, `host::call(op, params)` sends one of these to RustGIS:
 | `host.view` | `{center: [lon, lat], scale, projection}` |
 | `host.notify` `{text, error?}` | shows a message in the status bar |
 | `host.addLayer` `{name, geojson}` | adds a layer (`edit`) |
+| `layer.addUrl` `{url, name?, layer?, zoom?, ...}` | downloads a data file and adds its layers (`edit` and `network`, see [Data from the web](#data-from-the-web)) |
 | `map.addTiles` `{url, kind?, name?, attribution?, minZoom?, maxZoom?, tileSize?, tms?, subdomains?, opacity?, overlay?, replace?, id?}` | adds a web tile layer: raster tiles, vector tiles or a MapLibre style (`edit` and `network`); `id` marks it so the plugin can find it again in `map.tiles` |
 | `map.tiles` | the map's tile layers, top first: `[{index, name, id, kind, url, visible, opacity, overlay, attribution, minZoom, maxZoom}]` |
 | `map.removeTiles` `{index? \| name? \| id?}`, `map.setTiles` `{index? \| name?, visible?, opacity?, move?, rename?}` | removes (every one when none is named) and changes tile layers (`edit`) |

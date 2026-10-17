@@ -28,6 +28,8 @@ for the design, the permissions and the ABI.
 
 ## Build
 
+The scripts need Python 3.11 or later.
+
 ```sh
 rustup target add wasm32-unknown-unknown
 python scripts/build.py --check        # dist/registry.json and dist/packages/

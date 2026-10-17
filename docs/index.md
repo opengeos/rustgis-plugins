@@ -26,8 +26,8 @@ rustgis-cli run --sample --cmd 'gp.run={"tool":"plugin:vector-toolkit/hexagon-gr
 ## Safety
 
 A plugin can read the map. It can change the project only with the `edit` permission, use files
-only with the `files` permission, and add web tile layers (which the map then loads from
-addresses the plugin chose) only with the `network` permission. You see them before installing.
+only with the `files` permission, and have RustGIS fetch from addresses it chooses (web tile
+layers, data files, web services) only with the `network` permission. You see them before installing.
 Plugins have no other access to your computer or the network. Each call has a time and memory budget, so a misbehaving
 plugin is stopped, and it can't crash RustGIS. Every plugin here is reviewed before it is
 listed. Withdrawn plugins are listed in [`blocklist.json`](https://plugins.rustgis.app/blocklist.json),
