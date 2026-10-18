@@ -31,13 +31,17 @@ else:
 # (release number, date, metadata service), oldest first.
 releases = []
 for num, item in config.items():
-    date = re.search(r"\d{4}-\d\d-\d\d", item["itemTitle"]).group()
+    found = re.search(r"\d{4}-\d\d-\d\d", item["itemTitle"])
+    assert found, f"release {num}: no date in its title {item['itemTitle']!r}"
+    date = found.group()
     assert item["itemURL"] == TILES.format(num), item["itemURL"]
     meta = METADATA.match(item["metadataLayerUrl"])
     assert meta, item["metadataLayerUrl"]
     releases.append((int(num), date, meta.group(1)))
 releases.sort(key=lambda r: (r[1], r[0]))
-assert len({r[1] for r in releases}) == len(releases), "two releases on one day"
+# Releases are found by date, so two on one day would need a decision: stop and look.
+same = sorted({r[1] for r in releases if sum(x[1] == r[1] for x in releases) > 1})
+assert not same, f"two releases on one day: {same}"
 years = sorted({r[1][:4] for r in releases})
 
 ADD = '"add"?: bool (keep the releases already on the map, instead of replacing the top one)'

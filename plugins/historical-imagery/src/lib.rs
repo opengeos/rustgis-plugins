@@ -233,6 +233,10 @@ fn show(req: &Request, all: &Releases, top: Option<u32>, r: &Release, add: bool)
     }
     if let (Some(n), false) = (top, add) {
         host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
+    } else if add && on_map()?.contains(&r.num) {
+        // Stacked lower down: one layer per release.
+        host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
+        return Ok(done);
     }
     host::run(
         "map.addTiles",
@@ -368,16 +372,16 @@ fn list(req: &Request, all: &Releases) -> Result<Value, String> {
 /// The name prefix of the imagery source layers Imagery Info adds.
 const SOURCE: &str = "Imagery source · ";
 
+/// Whether a layer name is one Imagery Info gives: `Imagery source · Wayback 2019-05-08`.
+pub fn is_source(name: &str) -> bool {
+    name.strip_prefix(SOURCE).and_then(|n| n.strip_prefix("Wayback ")).is_some_and(|d| d.len() == 10 && valid_date(d))
+}
+
 /// Removes the imagery source layers Imagery Info added.
 fn remove_sources() -> Result<usize, String> {
     let layers = host::layers()?;
-    let ids: Vec<Value> = layers
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|l| l["name"].as_str().is_some_and(|n| n.starts_with(SOURCE)))
-        .map(|l| l["id"].clone())
-        .collect();
+    let ids: Vec<Value> =
+        layers.as_array().into_iter().flatten().filter(|l| l["name"].as_str().is_some_and(is_source)).map(|l| l["id"].clone()).collect();
     for id in &ids {
         host::run("layer.remove", json!({"layer": id}))?;
     }
@@ -470,6 +474,8 @@ mod tests {
         let u = r.metadata_url(-84.39, 33.75, 18.2);
         assert!(u.contains("World_Imagery_Metadata_2014_r01/MapServer/5/query?") && u.contains("geometry=-84.390000,33.750000"), "{u}");
         assert!(r.metadata_url(0.0, 0.0, 3.0).contains("/MapServer/13/query"));
+        assert!(is_source(&format!("{SOURCE}{}", r.name())));
+        assert!(!is_source("Imagery source · my notes") && !is_source("Imagery source · Wayback 2019-05-08 copy"));
         assert!(r.metadata_url(0.0, 0.0, 25.0).contains("/MapServer/0/query"));
     }
 
