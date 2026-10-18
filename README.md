@@ -18,6 +18,7 @@ for the design, the permissions and the ABI.
 | [`plugins/basemaps/`](plugins/basemaps) | **Basemaps**: a tab of keyless public basemaps (OpenStreetMap, Esri, USGS, NASA, OpenFreeMap and VersaTiles vector maps) and overlays |
 | [`plugins/map-explorer/`](plugins/map-explorer) | **Map Explorer**: a ribbon tab of its own (groups, a menu, a tool button) for jumping around the map, selecting and summarizing |
 | [`plugins/ide-chile/`](plugins/ide-chile) | **IDE Chile**: the public geospatial services of Chile (Geoportal de Chile, IDE MINAGRI, IDE MINVU, INE Census 2017) as one-click layers, map images or features, in a tab of their own |
+| [`plugins/historical-imagery/`](plugins/historical-imagery) | **Historical Imagery**: Esri's World Imagery Wayback, every archived release of World Imagery since 2014, stepped through by release or year, with the capture date and source of the imagery at any place |
 | [`registry/`](registry) | one file per listed plugin |
 | [`blocklist.json`](blocklist.json) | withdrawn plugins |
 | [`scripts/build.py`](scripts/build.py) | builds, checks and packages what changed into `dist/` |

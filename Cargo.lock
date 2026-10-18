@@ -17,6 +17,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "historical-imagery"
+version = "0.1.0"
+dependencies = [
+ "rustgis-plugin",
+]
+
+[[package]]
 name = "ide-chile"
 version = "0.1.0"
 dependencies = [
