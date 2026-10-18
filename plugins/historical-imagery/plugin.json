@@ -156,7 +156,7 @@
     {
       "id": "clear",
       "label": "Remove",
-      "help": "Remove the Wayback imagery from the map.",
+      "help": "Remove the Wayback imagery, and the imagery source layers, from the map.",
       "icon": "delete"
     }
   ],
@@ -245,7 +245,6 @@
       "Releases": "Buraxılışlar",
       "How many releases there are, and which is on the map.": "Neçə buraxılış olduğu və xəritədə hansının olduğu.",
       "Remove": "Sil",
-      "Remove the Wayback imagery from the map.": "Wayback təsvirini xəritədən sil.",
       "Wayback": "Wayback",
       "Release": "Buraxılış",
       "Year": "İl",
@@ -259,14 +258,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} ən yeni buraxılışdır.",
       "Wayback {date} is the first release.": "Wayback {date} ilk buraxılışdır.",
       "Add a Wayback release first (Wayback › Latest).": "Əvvəlcə bir Wayback buraxılışı əlavə edin (Wayback › Ən yeni).",
-      "Looking up the imagery source in Wayback {date}…": "Wayback {date} daxilində təsvir mənbəyi axtarılır…",
       "Wayback {date} has no imagery source here.": "Wayback {date} burada təsvir mənbəyinə malik deyil.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "{captured} tarixində {source} tərəfindən çəkilib, piksel başına {res} m (Wayback {date} daxilində)",
       "{total} releases, {first} to {last}. None is on the map.": "{total} buraxılış, {first} - {last}. Xəritədə heç biri yoxdur.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} buraxılış, {first} - {last}. Xəritədə: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Esri-nin siyahısı oxuna bilmədi: bunlar plaginin bildiyi buraxılışlardır.)",
       "No Wayback imagery on the map.": "Xəritədə Wayback təsviri yoxdur.",
-      "Removed the Wayback imagery.": "Wayback təsviri silindi."
+      "Removed the Wayback imagery.": "Wayback təsviri silindi.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback təsvirlərini və təsvir mənbəyi laylarını xəritədən sil.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} daxilində təsvir mənbəyi axtarılır: çəkiliş tarixi, mənbəyi və ayırdetməsi yeni layın cədvəlində olacaq."
     },
     "de": {
       "Historical Imagery": "Historische Luftbilder",
@@ -300,7 +300,6 @@
       "Releases": "Versionen",
       "How many releases there are, and which is on the map.": "Wie viele Versionen es gibt und welche auf der Karte ist.",
       "Remove": "Entfernen",
-      "Remove the Wayback imagery from the map.": "Die Wayback-Bilder von der Karte entfernen.",
       "Wayback": "Wayback",
       "Release": "Version",
       "Year": "Jahr",
@@ -314,14 +313,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} ist die neueste Version.",
       "Wayback {date} is the first release.": "Wayback {date} ist die erste Version.",
       "Add a Wayback release first (Wayback › Latest).": "Fügen Sie zuerst eine Wayback-Version hinzu (Wayback › Neueste).",
-      "Looking up the imagery source in Wayback {date}…": "Bildquelle in Wayback {date} wird gesucht…",
       "Wayback {date} has no imagery source here.": "Wayback {date} hat hier keine Bildquelle.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Aufgenommen am {captured} von {source}, {res} m pro Pixel (in Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} Versionen, {first} bis {last}. Keine ist auf der Karte.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} Versionen, {first} bis {last}. Auf der Karte: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Die Liste von Esri konnte nicht gelesen werden: Dies sind die Versionen, die das Plugin kennt.)",
       "No Wayback imagery on the map.": "Keine Wayback-Bilder auf der Karte.",
-      "Removed the Wayback imagery.": "Die Wayback-Bilder wurden entfernt."
+      "Removed the Wayback imagery.": "Die Wayback-Bilder wurden entfernt.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Die Wayback-Bilder und die Ebenen der Bildquellen von der Karte entfernen.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Bildquelle in Wayback {date} wird gesucht: Aufnahmedatum, Quelle und Auflösung stehen in der Tabelle der neuen Ebene."
     },
     "es": {
       "Historical Imagery": "Imágenes históricas",
@@ -355,7 +355,6 @@
       "Releases": "Versiones",
       "How many releases there are, and which is on the map.": "Cuántas versiones hay y cuál está en el mapa.",
       "Remove": "Quitar",
-      "Remove the Wayback imagery from the map.": "Quitar las imágenes de Wayback del mapa.",
       "Wayback": "Wayback",
       "Release": "Versión",
       "Year": "Año",
@@ -369,14 +368,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} es la versión más reciente.",
       "Wayback {date} is the first release.": "Wayback {date} es la primera versión.",
       "Add a Wayback release first (Wayback › Latest).": "Añada primero una versión de Wayback (Wayback › Más reciente).",
-      "Looking up the imagery source in Wayback {date}…": "Buscando la fuente de las imágenes en Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} no tiene fuente de imágenes aquí.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Capturada el {captured} por {source}, {res} m por píxel (en Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} versiones, de {first} a {last}. Ninguna está en el mapa.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} versiones, de {first} a {last}. En el mapa: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(No se pudo leer la lista de Esri: estas son las versiones que conoce el complemento.)",
       "No Wayback imagery on the map.": "No hay imágenes de Wayback en el mapa.",
-      "Removed the Wayback imagery.": "Se quitaron las imágenes de Wayback."
+      "Removed the Wayback imagery.": "Se quitaron las imágenes de Wayback.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Quitar del mapa las imágenes de Wayback y las capas de origen de las imágenes.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Buscando el origen de las imágenes en Wayback {date}: su fecha de captura, fuente y resolución estarán en la tabla de la nueva capa."
     },
     "fr": {
       "Historical Imagery": "Imagerie historique",
@@ -410,7 +410,6 @@
       "Releases": "Versions",
       "How many releases there are, and which is on the map.": "Le nombre de versions, et celle qui est sur la carte.",
       "Remove": "Retirer",
-      "Remove the Wayback imagery from the map.": "Retirer l'imagerie Wayback de la carte.",
       "Wayback": "Wayback",
       "Release": "Version",
       "Year": "Année",
@@ -424,14 +423,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} est la version la plus récente.",
       "Wayback {date} is the first release.": "Wayback {date} est la première version.",
       "Add a Wayback release first (Wayback › Latest).": "Ajoutez d'abord une version Wayback (Wayback › Récente).",
-      "Looking up the imagery source in Wayback {date}…": "Recherche de la source de l'imagerie dans Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} n'a pas de source d'imagerie ici.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Prise le {captured} par {source}, {res} m par pixel (dans Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} versions, de {first} à {last}. Aucune n'est sur la carte.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} versions, de {first} à {last}. Sur la carte : {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(La liste d'Esri n'a pas pu être lue : voici les versions que connaît l'extension.)",
       "No Wayback imagery on the map.": "Aucune imagerie Wayback sur la carte.",
-      "Removed the Wayback imagery.": "L'imagerie Wayback a été retirée."
+      "Removed the Wayback imagery.": "L'imagerie Wayback a été retirée.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Retirer de la carte l'imagerie Wayback et les couches de source d'imagerie.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Recherche de la source de l'imagerie dans Wayback {date} : sa date de prise de vue, sa source et sa résolution seront dans la table de la nouvelle couche."
     },
     "id": {
       "Historical Imagery": "Citra Historis",
@@ -465,7 +465,6 @@
       "Releases": "Rilis",
       "How many releases there are, and which is on the map.": "Berapa banyak rilis yang ada, dan mana yang ada di peta.",
       "Remove": "Hapus",
-      "Remove the Wayback imagery from the map.": "Hapus citra Wayback dari peta.",
       "Wayback": "Wayback",
       "Release": "Rilis",
       "Year": "Tahun",
@@ -479,14 +478,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} adalah rilis terbaru.",
       "Wayback {date} is the first release.": "Wayback {date} adalah rilis pertama.",
       "Add a Wayback release first (Wayback › Latest).": "Tambahkan rilis Wayback terlebih dahulu (Wayback › Terbaru).",
-      "Looking up the imagery source in Wayback {date}…": "Mencari sumber citra di Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} tidak memiliki sumber citra di sini.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Direkam {captured} oleh {source}, {res} m per piksel (di Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} rilis, {first} hingga {last}. Tidak ada yang di peta.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} rilis, {first} hingga {last}. Di peta: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Daftar Esri tidak dapat dibaca: ini adalah rilis yang diketahui plugin.)",
       "No Wayback imagery on the map.": "Tidak ada citra Wayback di peta.",
-      "Removed the Wayback imagery.": "Citra Wayback telah dihapus."
+      "Removed the Wayback imagery.": "Citra Wayback telah dihapus.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Hapus citra Wayback dan layer sumber citra dari peta.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Mencari sumber citra di Wayback {date}: tanggal pengambilan, sumber, dan resolusinya akan ada di tabel layer baru."
     },
     "it": {
       "Historical Imagery": "Immagini storiche",
@@ -520,7 +520,6 @@
       "Releases": "Versioni",
       "How many releases there are, and which is on the map.": "Quante versioni ci sono e quale è sulla mappa.",
       "Remove": "Rimuovi",
-      "Remove the Wayback imagery from the map.": "Rimuovi le immagini di Wayback dalla mappa.",
       "Wayback": "Wayback",
       "Release": "Versione",
       "Year": "Anno",
@@ -534,14 +533,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} è la versione più recente.",
       "Wayback {date} is the first release.": "Wayback {date} è la prima versione.",
       "Add a Wayback release first (Wayback › Latest).": "Aggiungi prima una versione di Wayback (Wayback › Più recente).",
-      "Looking up the imagery source in Wayback {date}…": "Ricerca della fonte delle immagini in Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} non ha una fonte di immagini qui.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Acquisita il {captured} da {source}, {res} m per pixel (in Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} versioni, da {first} a {last}. Nessuna è sulla mappa.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} versioni, da {first} a {last}. Sulla mappa: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Impossibile leggere l'elenco di Esri: queste sono le versioni che il plugin conosce.)",
       "No Wayback imagery on the map.": "Nessuna immagine di Wayback sulla mappa.",
-      "Removed the Wayback imagery.": "Immagini di Wayback rimosse."
+      "Removed the Wayback imagery.": "Immagini di Wayback rimosse.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Rimuovi dalla mappa le immagini Wayback e i layer delle fonti delle immagini.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Ricerca della fonte delle immagini in Wayback {date}: data di acquisizione, fonte e risoluzione saranno nella tabella del nuovo layer."
     },
     "ja": {
       "Historical Imagery": "過去の衛星画像",
@@ -575,7 +575,6 @@
       "Releases": "リリース",
       "How many releases there are, and which is on the map.": "リリースの数と、地図上に表示中のリリース。",
       "Remove": "削除",
-      "Remove the Wayback imagery from the map.": "地図から Wayback 画像を削除します。",
       "Wayback": "Wayback",
       "Release": "リリース",
       "Year": "年",
@@ -589,14 +588,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} は最新のリリースです。",
       "Wayback {date} is the first release.": "Wayback {date} は最初のリリースです。",
       "Add a Wayback release first (Wayback › Latest).": "先に Wayback リリースを追加してください（Wayback › 最新）。",
-      "Looking up the imagery source in Wayback {date}…": "Wayback {date} の画像ソースを検索中…",
       "Wayback {date} has no imagery source here.": "Wayback {date} にはこの場所の画像ソースがありません。",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "{captured} に {source} が撮影、1 ピクセルあたり {res} m（Wayback {date}）",
       "{total} releases, {first} to {last}. None is on the map.": "{total} 件のリリース（{first}～{last}）。地図上にはありません。",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} 件のリリース（{first}～{last}）。地図上: {shown}。",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "（Esri のリストを読み込めませんでした: プラグインが把握しているリリースを表示しています。）",
       "No Wayback imagery on the map.": "地図上に Wayback 画像はありません。",
-      "Removed the Wayback imagery.": "Wayback 画像を削除しました。"
+      "Removed the Wayback imagery.": "Wayback 画像を削除しました。",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback 画像と画像ソースのレイヤーをマップから削除します。",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} の画像ソースを検索しています。撮影日、ソース、解像度は新しいレイヤーのテーブルに表示されます。"
     },
     "ko": {
       "Historical Imagery": "과거 영상",
@@ -630,7 +630,6 @@
       "Releases": "릴리스",
       "How many releases there are, and which is on the map.": "릴리스 수와 지도에 표시된 릴리스입니다.",
       "Remove": "제거",
-      "Remove the Wayback imagery from the map.": "지도에서 Wayback 영상을 제거합니다.",
       "Wayback": "Wayback",
       "Release": "릴리스",
       "Year": "연도",
@@ -644,14 +643,15 @@
       "Wayback {date} is the latest release.": "Wayback {date}은(는) 최신 릴리스입니다.",
       "Wayback {date} is the first release.": "Wayback {date}은(는) 첫 릴리스입니다.",
       "Add a Wayback release first (Wayback › Latest).": "먼저 Wayback 릴리스를 추가하세요 (Wayback › 최신).",
-      "Looking up the imagery source in Wayback {date}…": "Wayback {date}에서 영상 출처를 찾는 중…",
       "Wayback {date} has no imagery source here.": "Wayback {date}에는 이곳의 영상 출처가 없습니다.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "{captured}에 {source} 촬영, 픽셀당 {res} m (Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "릴리스 {total}개, {first}~{last}. 지도에 표시된 릴리스가 없습니다.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "릴리스 {total}개, {first}~{last}. 지도에 표시: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Esri 목록을 읽을 수 없습니다: 플러그인이 알고 있는 릴리스입니다.)",
       "No Wayback imagery on the map.": "지도에 Wayback 영상이 없습니다.",
-      "Removed the Wayback imagery.": "Wayback 영상을 제거했습니다."
+      "Removed the Wayback imagery.": "Wayback 영상을 제거했습니다.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "지도에서 Wayback 영상과 영상 출처 레이어를 제거합니다.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date}의 영상 출처를 조회하는 중입니다. 촬영 날짜, 출처, 해상도는 새 레이어의 테이블에 표시됩니다."
     },
     "nl": {
       "Historical Imagery": "Historische beelden",
@@ -685,7 +685,6 @@
       "Releases": "Versies",
       "How many releases there are, and which is on the map.": "Hoeveel versies er zijn en welke op de kaart staat.",
       "Remove": "Verwijderen",
-      "Remove the Wayback imagery from the map.": "De Wayback-beelden van de kaart verwijderen.",
       "Wayback": "Wayback",
       "Release": "Versie",
       "Year": "Jaar",
@@ -699,14 +698,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} is de nieuwste versie.",
       "Wayback {date} is the first release.": "Wayback {date} is de eerste versie.",
       "Add a Wayback release first (Wayback › Latest).": "Voeg eerst een Wayback-versie toe (Wayback › Nieuwste).",
-      "Looking up the imagery source in Wayback {date}…": "Beeldbron opzoeken in Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} heeft hier geen beeldbron.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Opgenomen op {captured} door {source}, {res} m per pixel (in Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} versies, {first} tot {last}. Geen ervan staat op de kaart.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} versies, {first} tot {last}. Op de kaart: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(De lijst van Esri kon niet worden gelezen: dit zijn de versies die de plug-in kent.)",
       "No Wayback imagery on the map.": "Geen Wayback-beelden op de kaart.",
-      "Removed the Wayback imagery.": "De Wayback-beelden zijn verwijderd."
+      "Removed the Wayback imagery.": "De Wayback-beelden zijn verwijderd.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "De Wayback-beelden en de lagen met beeldbronnen van de kaart verwijderen.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Beeldbron in Wayback {date} wordt opgezocht: opnamedatum, bron en resolutie staan in de tabel van de nieuwe laag."
     },
     "pt": {
       "Historical Imagery": "Imagens históricas",
@@ -740,7 +740,6 @@
       "Releases": "Versões",
       "How many releases there are, and which is on the map.": "Quantas versões existem e qual está no mapa.",
       "Remove": "Remover",
-      "Remove the Wayback imagery from the map.": "Remover as imagens do Wayback do mapa.",
       "Wayback": "Wayback",
       "Release": "Versão",
       "Year": "Ano",
@@ -754,14 +753,15 @@
       "Wayback {date} is the latest release.": "O Wayback {date} é a versão mais recente.",
       "Wayback {date} is the first release.": "O Wayback {date} é a primeira versão.",
       "Add a Wayback release first (Wayback › Latest).": "Adicione primeiro uma versão do Wayback (Wayback › Mais recente).",
-      "Looking up the imagery source in Wayback {date}…": "Procurando a fonte das imagens no Wayback {date}…",
       "Wayback {date} has no imagery source here.": "O Wayback {date} não tem fonte de imagens aqui.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Capturada em {captured} por {source}, {res} m por pixel (no Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} versões, de {first} a {last}. Nenhuma está no mapa.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} versões, de {first} a {last}. No mapa: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Não foi possível ler a lista da Esri: estas são as versões que o plugin conhece.)",
       "No Wayback imagery on the map.": "Nenhuma imagem do Wayback no mapa.",
-      "Removed the Wayback imagery.": "As imagens do Wayback foram removidas."
+      "Removed the Wayback imagery.": "As imagens do Wayback foram removidas.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Remover do mapa as imagens Wayback e as camadas de origem das imagens.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "A procurar a origem das imagens em Wayback {date}: a data de captura, a fonte e a resolução estarão na tabela da nova camada."
     },
     "ru": {
       "Historical Imagery": "Исторические снимки",
@@ -795,7 +795,6 @@
       "Releases": "Выпуски",
       "How many releases there are, and which is on the map.": "Сколько всего выпусков и какой из них на карте.",
       "Remove": "Удалить",
-      "Remove the Wayback imagery from the map.": "Удалить снимки Wayback с карты.",
       "Wayback": "Wayback",
       "Release": "Выпуск",
       "Year": "Год",
@@ -809,14 +808,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} — последний выпуск.",
       "Wayback {date} is the first release.": "Wayback {date} — первый выпуск.",
       "Add a Wayback release first (Wayback › Latest).": "Сначала добавьте выпуск Wayback (Wayback › Последний).",
-      "Looking up the imagery source in Wayback {date}…": "Поиск источника снимков в Wayback {date}…",
       "Wayback {date} has no imagery source here.": "В Wayback {date} здесь нет источника снимков.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Снято {captured}, источник {source}, {res} м на пиксель (в Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "Выпусков: {total}, с {first} по {last}. На карте ни одного.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "Выпусков: {total}, с {first} по {last}. На карте: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Не удалось прочитать список Esri: это выпуски, известные модулю.)",
       "No Wayback imagery on the map.": "На карте нет снимков Wayback.",
-      "Removed the Wayback imagery.": "Снимки Wayback удалены."
+      "Removed the Wayback imagery.": "Снимки Wayback удалены.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Убрать с карты снимки Wayback и слои источников снимков.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Поиск источника снимков в Wayback {date}: дата съёмки, источник и разрешение будут в таблице нового слоя."
     },
     "tr": {
       "Historical Imagery": "Tarihsel Görüntüler",
@@ -850,7 +850,6 @@
       "Releases": "Sürümler",
       "How many releases there are, and which is on the map.": "Kaç sürüm olduğu ve haritada hangisinin bulunduğu.",
       "Remove": "Kaldır",
-      "Remove the Wayback imagery from the map.": "Wayback görüntüsünü haritadan kaldır.",
       "Wayback": "Wayback",
       "Release": "Sürüm",
       "Year": "Yıl",
@@ -864,14 +863,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} en yeni sürümdür.",
       "Wayback {date} is the first release.": "Wayback {date} ilk sürümdür.",
       "Add a Wayback release first (Wayback › Latest).": "Önce bir Wayback sürümü ekleyin (Wayback › En Yeni).",
-      "Looking up the imagery source in Wayback {date}…": "Wayback {date} içinde görüntü kaynağı aranıyor…",
       "Wayback {date} has no imagery source here.": "Wayback {date} burada görüntü kaynağı içermiyor.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "{captured} tarihinde {source} tarafından çekildi, piksel başına {res} m (Wayback {date} içinde)",
       "{total} releases, {first} to {last}. None is on the map.": "{total} sürüm, {first} - {last}. Haritada hiçbiri yok.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} sürüm, {first} - {last}. Haritada: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Esri'nin listesi okunamadı: bunlar eklentinin bildiği sürümlerdir.)",
       "No Wayback imagery on the map.": "Haritada Wayback görüntüsü yok.",
-      "Removed the Wayback imagery.": "Wayback görüntüsü kaldırıldı."
+      "Removed the Wayback imagery.": "Wayback görüntüsü kaldırıldı.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback görüntülerini ve görüntü kaynağı katmanlarını haritadan kaldır.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} içinde görüntü kaynağı aranıyor: çekim tarihi, kaynağı ve çözünürlüğü yeni katmanın tablosunda olacak."
     },
     "vi": {
       "Historical Imagery": "Ảnh lịch sử",
@@ -905,7 +905,6 @@
       "Releases": "Các phiên bản",
       "How many releases there are, and which is on the map.": "Có bao nhiêu phiên bản và phiên bản nào đang trên bản đồ.",
       "Remove": "Gỡ bỏ",
-      "Remove the Wayback imagery from the map.": "Gỡ ảnh Wayback khỏi bản đồ.",
       "Wayback": "Wayback",
       "Release": "Phiên bản",
       "Year": "Năm",
@@ -919,14 +918,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} là phiên bản mới nhất.",
       "Wayback {date} is the first release.": "Wayback {date} là phiên bản đầu tiên.",
       "Add a Wayback release first (Wayback › Latest).": "Hãy thêm một phiên bản Wayback trước (Wayback › Mới nhất).",
-      "Looking up the imagery source in Wayback {date}…": "Đang tìm nguồn ảnh trong Wayback {date}…",
       "Wayback {date} has no imagery source here.": "Wayback {date} không có nguồn ảnh ở đây.",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "Chụp ngày {captured} bởi {source}, {res} m mỗi pixel (trong Wayback {date})",
       "{total} releases, {first} to {last}. None is on the map.": "{total} phiên bản, từ {first} đến {last}. Không có phiên bản nào trên bản đồ.",
       "{total} releases, {first} to {last}. On the map: {shown}.": "{total} phiên bản, từ {first} đến {last}. Trên bản đồ: {shown}.",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "(Không đọc được danh sách của Esri: đây là các phiên bản mà plugin biết.)",
       "No Wayback imagery on the map.": "Không có ảnh Wayback trên bản đồ.",
-      "Removed the Wayback imagery.": "Đã gỡ ảnh Wayback."
+      "Removed the Wayback imagery.": "Đã gỡ ảnh Wayback.",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "Xóa ảnh Wayback và các lớp nguồn ảnh khỏi bản đồ.",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Đang tra cứu nguồn ảnh trong Wayback {date}: ngày chụp, nguồn và độ phân giải sẽ có trong bảng của lớp mới."
     },
     "zh": {
       "Historical Imagery": "历史影像",
@@ -960,7 +960,6 @@
       "Releases": "版本",
       "How many releases there are, and which is on the map.": "共有多少个版本，以及地图上显示的是哪一个。",
       "Remove": "移除",
-      "Remove the Wayback imagery from the map.": "从地图中移除 Wayback 影像。",
       "Wayback": "Wayback",
       "Release": "版本",
       "Year": "年份",
@@ -974,14 +973,15 @@
       "Wayback {date} is the latest release.": "Wayback {date} 是最新版本。",
       "Wayback {date} is the first release.": "Wayback {date} 是第一个版本。",
       "Add a Wayback release first (Wayback › Latest).": "请先添加一个 Wayback 版本（Wayback › 最新）。",
-      "Looking up the imagery source in Wayback {date}…": "正在 Wayback {date} 中查找影像来源…",
       "Wayback {date} has no imagery source here.": "Wayback {date} 在此处没有影像来源。",
       "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})": "由 {source} 于 {captured} 拍摄，每像素 {res} 米（Wayback {date}）",
       "{total} releases, {first} to {last}. None is on the map.": "共 {total} 个版本，从 {first} 到 {last}。地图上没有任何版本。",
       "{total} releases, {first} to {last}. On the map: {shown}.": "共 {total} 个版本，从 {first} 到 {last}。地图上：{shown}。",
       "(Esri's list couldn't be read: these are the releases the plugin knows.)": "（无法读取 Esri 的列表：以下是插件已知的版本。）",
       "No Wayback imagery on the map.": "地图上没有 Wayback 影像。",
-      "Removed the Wayback imagery.": "已移除 Wayback 影像。"
+      "Removed the Wayback imagery.": "已移除 Wayback 影像。",
+      "Remove the Wayback imagery, and the imagery source layers, from the map.": "从地图中移除 Wayback 影像及影像来源图层。",
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "正在查询 Wayback {date} 中的影像来源：其拍摄日期、来源和分辨率将显示在新图层的属性表中。"
     }
   }
 }

@@ -162,7 +162,13 @@ pub fn parse_layer(l: &Value) -> Option<Release> {
     let (year, n) = l["name"].as_str()?.strip_prefix("WB_")?.split_once("_R")?;
     let date = l["title"].as_str()?.split("Wayback ").nth(1)?.get(..10)?;
     let num = l["offer"]["url"].as_str()?.split("/tile/").nth(1)?.split('/').next()?.parse().ok()?;
-    valid_date(date).then(|| Release { num, date: date.into(), metadata: format!("World_Imagery_Metadata_{year}_r{}", n.to_lowercase()) })
+    // The name goes into the metadata address's path: only a year and a release's digits.
+    let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    (year.len() == 4 && digits(year) && n.len() <= 4 && digits(n) && valid_date(date)).then(|| Release {
+        num,
+        date: date.into(),
+        metadata: format!("World_Imagery_Metadata_{year}_r{}", n.to_lowercase()),
+    })
 }
 
 fn handle(req: Request) -> Result<Value, String> {
@@ -171,19 +177,20 @@ fn handle(req: Request) -> Result<Value, String> {
     // Esri's live list is read only when the baked one may be out of date for this command.
     let baked = Releases::baked();
     let unknown = top.is_some_and(|n| baked.find(n).is_none());
-    let live = match req.id.as_str() {
-        "latest" | "releases" => true,
-        "newer" => top.and_then(|n| baked.index(n)).is_none_or(|i| i + 1 == baked.list.len()),
-        "older" | "info" => unknown,
-        "release" => match (req.f64("release"), req.str("date")) {
-            (Some(n), _) => !baked.list.iter().any(|r| f64::from(r.num) == n),
-            (None, Some(d)) => baked.reaches_past(d),
-            (None, None) => false,
-        },
-        id => id.strip_prefix("year-").is_some_and(|y| baked.reaches_past(y)),
-    };
+    // A release on the map that the baked list lacks is newer than it: read the live list.
+    let live = unknown
+        || match req.id.as_str() {
+            "latest" | "releases" => true,
+            "newer" => top.and_then(|n| baked.index(n)).is_none_or(|i| i + 1 == baked.list.len()),
+            "older" | "info" => false,
+            "release" => match (req.f64("release"), req.str("date")) {
+                (Some(n), _) => !baked.list.iter().any(|r| f64::from(r.num) == n),
+                (None, Some(d)) => baked.reaches_past(d),
+                (None, None) => false,
+            },
+            id => id.strip_prefix("year-").is_some_and(|y| baked.reaches_past(y)),
+        };
     let all = if live { Releases::load(true) } else { baked };
-    let top = top.and_then(|n| all.find(n));
     match req.id.as_str() {
         "latest" => show(&req, &all, top, all.last(), add),
         "oldest" => show(&req, &all, top, all.first(), add),
@@ -197,7 +204,7 @@ fn handle(req: Request) -> Result<Value, String> {
             let r = r.ok_or_else(|| req.tr(MANIFEST, "No release matches that: the first is {date}.", &[("date", &all.first().date)]))?;
             show(&req, &all, top, r, add)
         }
-        "info" => info(&req, top),
+        "info" => info(&req, top.and_then(|n| all.find(n))),
         "releases" => list(&req, &all),
         "clear" => clear(&req),
         other => match other.strip_prefix("year-").and_then(|y| all.on_or_before(y)) {
@@ -217,16 +224,15 @@ fn on_map() -> Result<Vec<u32>, String> {
 }
 
 /// Adds a release, replacing the one on top unless `add`.
-fn show(req: &Request, all: &Releases, top: Option<&Release>, r: &Release, add: bool) -> Result<Value, String> {
+/// `top` is the release number on top, which may be one neither list knows.
+fn show(req: &Request, all: &Releases, top: Option<u32>, r: &Release, add: bool) -> Result<Value, String> {
     let done = json!({"release": r.num, "date": r.date, "live": all.live});
-    if let Some(cur) = top {
-        if cur.num == r.num {
-            host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
-            return Ok(done);
-        }
-        if !add {
-            host::run("map.removeTiles", json!({"id": cur.id()}))?;
-        }
+    if top == Some(r.num) {
+        host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
+        return Ok(done);
+    }
+    if let (Some(n), false) = (top, add) {
+        host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
     }
     host::run(
         "map.addTiles",
@@ -245,8 +251,8 @@ fn show(req: &Request, all: &Releases, top: Option<&Release>, r: &Release, add: 
 }
 
 /// The release after (or before) the one on top, or the latest when there is none.
-fn step(req: &Request, all: &Releases, top: Option<&Release>, newer: bool, add: bool) -> Result<Value, String> {
-    let Some(cur) = top else {
+fn step(req: &Request, all: &Releases, top: Option<u32>, newer: bool, add: bool) -> Result<Value, String> {
+    let Some(cur) = top.and_then(|n| all.find(n)) else {
         return show(req, all, top, all.last(), add);
     };
     let i = all.index(cur.num).unwrap_or(0);
@@ -284,10 +290,17 @@ fn info(req: &Request, top: Option<&Release>) -> Result<Value, String> {
         _ => return Err("the map view has no centre".into()),
     };
     let zoom = view["scale"].as_f64().map_or(10.0, |s| zoom_of(s, lat));
-    let name = format!("Imagery source · {}", r.name());
+    let name = format!("{SOURCE}{}", r.name());
+    // One imagery source at a time: the last one asked for.
+    remove_sources()?;
     let out = host::run("layer.addUrl", json!({"url": r.metadata_url(lon, lat, zoom), "name": name, "zoom": false}))?;
     if out.get("pending").and_then(Value::as_bool) == Some(true) {
-        host::notify(&req.tr(MANIFEST, "Looking up the imagery source in Wayback {date}…", &[("date", &r.date)]));
+        // The web app downloads it off the frame: its details land in the layer's table.
+        host::notify(&req.tr(
+            MANIFEST,
+            "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.",
+            &[("date", &r.date)],
+        ));
         return Ok(out);
     }
     // The answer names the layer added; its one feature is the source.
@@ -352,12 +365,32 @@ fn list(req: &Request, all: &Releases) -> Result<Value, String> {
     Ok(json!({"releases": releases, "onMap": shown, "live": all.live}))
 }
 
+/// The name prefix of the imagery source layers Imagery Info adds.
+const SOURCE: &str = "Imagery source · ";
+
+/// Removes the imagery source layers Imagery Info added.
+fn remove_sources() -> Result<usize, String> {
+    let layers = host::layers()?;
+    let ids: Vec<Value> = layers
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|l| l["name"].as_str().is_some_and(|n| n.starts_with(SOURCE)))
+        .map(|l| l["id"].clone())
+        .collect();
+    for id in &ids {
+        host::run("layer.remove", json!({"layer": id}))?;
+    }
+    Ok(ids.len())
+}
+
 fn clear(req: &Request) -> Result<Value, String> {
     let shown = on_map()?;
+    let sources = remove_sources()?;
     for n in &shown {
         host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
     }
-    host::notify(&if shown.is_empty() {
+    host::notify(&if shown.is_empty() && sources == 0 {
         req.tr(MANIFEST, "No Wayback imagery on the map.", &[])
     } else {
         req.tr(MANIFEST, "Removed the Wayback imagery.", &[])
@@ -421,6 +454,10 @@ mod tests {
         assert_eq!(all.last(), &Release { num: 99999, date: "2100-01-15".into(), metadata: "World_Imagery_Metadata_2100_r01".into() });
         assert_eq!(all.find(15084).unwrap().metadata, "World_Imagery_Metadata_2015_r04");
         assert!(Releases::from_layers(&json!({"layers": []})).is_none());
+        // A name that would reach outside the metadata service's path is skipped.
+        for bad in ["WB_2100_R01/../x", "WB_21a0_R01", "WB_2100_R0?f=x", "WB_2100_R"] {
+            assert!(parse_layer(&layer(bad, "2100-01-15", 99999)).is_none(), "{bad}");
+        }
         assert!(Releases::from_layers(&json!({"error": "x"})).is_none());
     }
 

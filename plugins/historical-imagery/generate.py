@@ -56,7 +56,7 @@ commands += [
     {"id": "info", "label": "Imagery\nInfo", "help": "Where the imagery at the map's centre comes from: its capture date, source and resolution, with its footprint as a layer.",
      "icon": "identify", "params": '{"lon"?: number, "lat"?: number (default: the map\'s centre)}'},
     {"id": "releases", "label": "Releases", "help": "How many releases there are, and which is on the map.", "icon": "stats", "params": "{}"},
-    {"id": "clear", "label": "Remove", "help": "Remove the Wayback imagery from the map.", "icon": "delete", "params": "{}"},
+    {"id": "clear", "label": "Remove", "help": "Remove the Wayback imagery, and the imagery source layers, from the map.", "icon": "delete", "params": "{}"},
 ]
 for c in commands:
     if c["params"] == "{}":
