@@ -204,7 +204,7 @@ fn handle(req: Request) -> Result<Value, String> {
             let r = r.ok_or_else(|| req.tr(MANIFEST, "No release matches that: the first is {date}.", &[("date", &all.first().date)]))?;
             show(&req, &all, top, r, add)
         }
-        "info" => info(&req, top.and_then(|n| all.find(n))),
+        "info" => info(&req, top, top.and_then(|n| all.find(n))),
         "releases" => list(&req, &all),
         "clear" => clear(&req),
         other => match other.strip_prefix("year-").and_then(|y| all.on_or_before(y)) {
@@ -231,12 +231,17 @@ fn show(req: &Request, all: &Releases, top: Option<u32>, r: &Release, add: bool)
         host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
         return Ok(done);
     }
-    if let (Some(n), false) = (top, add) {
-        host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
-    } else if add && on_map()?.contains(&r.num) {
-        // Stacked lower down: one layer per release.
+    // One layer per release: one stacked lower down stays with `add`, and otherwise comes to the top.
+    let stacked = top.is_some() && on_map()?.contains(&r.num);
+    if add && stacked {
         host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
         return Ok(done);
+    }
+    if let (Some(n), false) = (top, add) {
+        host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
+    }
+    if stacked {
+        host::run("map.removeTiles", json!({"id": r.id()}))?;
     }
     host::run(
         "map.addTiles",
@@ -283,9 +288,17 @@ pub fn zoom_of(scale: f64, lat: f64) -> f64 {
 }
 
 /// The imagery source at a place in the release on top.
-fn info(req: &Request, top: Option<&Release>) -> Result<Value, String> {
-    let Some(r) = top else {
-        return Err(req.tr(MANIFEST, "Add a Wayback release first (Wayback › Latest).", &[]));
+/// `top` is the release number on top and `release` its release, when a list knows it.
+fn info(req: &Request, top: Option<u32>, release: Option<&Release>) -> Result<Value, String> {
+    let Some(r) = release else {
+        return Err(match top {
+            Some(n) => req.tr(
+                MANIFEST,
+                "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.",
+                &[("n", &n.to_string())],
+            ),
+            None => req.tr(MANIFEST, "Add a Wayback release first (Wayback › Latest).", &[]),
+        });
     };
     let view = host::view()?;
     let center = |i: usize| view["center"].get(i).and_then(Value::as_f64);
@@ -293,11 +306,12 @@ fn info(req: &Request, top: Option<&Release>) -> Result<Value, String> {
         (Some(lon), Some(lat)) if lon.is_finite() && lat.is_finite() => (lon, lat.clamp(-85.0, 85.0)),
         _ => return Err("the map view has no centre".into()),
     };
-    let zoom = view["scale"].as_f64().map_or(10.0, |s| zoom_of(s, lat));
+    let zoom = view["scale"].as_f64().filter(|s| s.is_finite() && *s > 0.0).map_or(10.0, |s| zoom_of(s, lat));
     let name = format!("{SOURCE}{}", r.name());
-    // One imagery source at a time: the last one asked for.
-    remove_sources()?;
+    // One imagery source at a time: the earlier ones go once the new one is in.
+    let earlier = sources()?;
     let out = host::run("layer.addUrl", json!({"url": r.metadata_url(lon, lat, zoom), "name": name, "zoom": false}))?;
+    remove_layers(&earlier)?;
     if out.get("pending").and_then(Value::as_bool) == Some(true) {
         // The web app downloads it off the frame: its details land in the layer's table.
         host::notify(&req.tr(
@@ -307,9 +321,14 @@ fn info(req: &Request, top: Option<&Release>) -> Result<Value, String> {
         ));
         return Ok(out);
     }
-    // The answer names the layer added; its one feature is the source.
-    let layer = out["layers"].get(0).and_then(|l| l["name"].as_str().or(l.as_str())).unwrap_or(&name).to_string();
-    let features = host::features(&layer, false).ok();
+    // The answer is the added layer's id; its one feature is the source. Added while the earlier
+    // one was still there, it took a numbered name: it gets the plain one back.
+    let added = out["layer"].clone();
+    let features = if added.is_null() { None } else { host::call("host.features", json!({"layer": added})).ok() };
+    if !added.is_null() {
+        host::run("layer.rename", json!({"layer": added, "name": name}))?;
+    }
+    let layer = name;
     let props = features.as_ref().and_then(|f| f["features"].get(0)).map(|f| f["properties"].clone());
     let Some(p) = props else {
         host::notify(&req.tr(MANIFEST, "Wayback {date} has no imagery source here.", &[("date", &r.date)]));
@@ -379,13 +398,22 @@ pub fn is_source(name: &str) -> bool {
 
 /// Removes the imagery source layers Imagery Info added.
 fn remove_sources() -> Result<usize, String> {
+    let ids = sources()?;
+    remove_layers(&ids)?;
+    Ok(ids.len())
+}
+
+/// The ids of the imagery source layers on the map.
+fn sources() -> Result<Vec<Value>, String> {
     let layers = host::layers()?;
-    let ids: Vec<Value> =
-        layers.as_array().into_iter().flatten().filter(|l| l["name"].as_str().is_some_and(is_source)).map(|l| l["id"].clone()).collect();
-    for id in &ids {
+    Ok(layers.as_array().into_iter().flatten().filter(|l| l["name"].as_str().is_some_and(is_source)).map(|l| l["id"].clone()).collect())
+}
+
+fn remove_layers(ids: &[Value]) -> Result<(), String> {
+    for id in ids {
         host::run("layer.remove", json!({"layer": id}))?;
     }
-    Ok(ids.len())
+    Ok(())
 }
 
 fn clear(req: &Request) -> Result<Value, String> {

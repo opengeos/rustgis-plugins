@@ -34,7 +34,7 @@ The imagery comes from Esri under its [terms of use](https://www.esri.com/en-us/
 
 ## Permissions
 
-edit and network (adding web tile layers, reading Esri's list of releases and the imagery's metadata)
+edit and network. Through RustGIS, the plugin adds Esri's Wayback tiles as web tile layers (`wayback.maptiles.arcgis.com`), reads the list of releases from Wayback's WMTS capabilities (the same host), and adds the imagery source from the releases' metadata services (`metadata.maptiles.arcgis.com`). It contacts no other host. With edit it adds and removes its own tile layers and imagery source layers, which it recognises by their id (`wayback-<release>`) and their exact name (`Imagery source · Wayback YYYY-MM-DD`).
 
 ## Build
 

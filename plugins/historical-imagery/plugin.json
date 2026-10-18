@@ -266,7 +266,8 @@
       "No Wayback imagery on the map.": "Xəritədə Wayback təsviri yoxdur.",
       "Removed the Wayback imagery.": "Wayback təsviri silindi.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback təsvirlərini və təsvir mənbəyi laylarını xəritədən sil.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} daxilində təsvir mənbəyi axtarılır: çəkiliş tarixi, mənbəyi və ayırdetməsi yeni layın cədvəlində olacaq."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} daxilində təsvir mənbəyi axtarılır: çəkiliş tarixi, mənbəyi və ayırdetməsi yeni layın cədvəlində olacaq.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "{n} buraxılışı plaqindən daha yenidir və Esri-nin buraxılış siyahısı oxuna bilmədi."
     },
     "de": {
       "Historical Imagery": "Historische Luftbilder",
@@ -321,7 +322,8 @@
       "No Wayback imagery on the map.": "Keine Wayback-Bilder auf der Karte.",
       "Removed the Wayback imagery.": "Die Wayback-Bilder wurden entfernt.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Die Wayback-Bilder und die Ebenen der Bildquellen von der Karte entfernen.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Bildquelle in Wayback {date} wird gesucht: Aufnahmedatum, Quelle und Auflösung stehen in der Tabelle der neuen Ebene."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Bildquelle in Wayback {date} wird gesucht: Aufnahmedatum, Quelle und Auflösung stehen in der Tabelle der neuen Ebene.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "Version {n} ist neuer als das Plugin, und Esris Liste der Versionen konnte nicht gelesen werden."
     },
     "es": {
       "Historical Imagery": "Imágenes históricas",
@@ -376,7 +378,8 @@
       "No Wayback imagery on the map.": "No hay imágenes de Wayback en el mapa.",
       "Removed the Wayback imagery.": "Se quitaron las imágenes de Wayback.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Quitar del mapa las imágenes de Wayback y las capas de origen de las imágenes.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Buscando el origen de las imágenes en Wayback {date}: su fecha de captura, fuente y resolución estarán en la tabla de la nueva capa."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Buscando el origen de las imágenes en Wayback {date}: su fecha de captura, fuente y resolución estarán en la tabla de la nueva capa.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "La versión {n} es más reciente que el complemento y no se pudo leer la lista de versiones de Esri."
     },
     "fr": {
       "Historical Imagery": "Imagerie historique",
@@ -431,7 +434,8 @@
       "No Wayback imagery on the map.": "Aucune imagerie Wayback sur la carte.",
       "Removed the Wayback imagery.": "L'imagerie Wayback a été retirée.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Retirer de la carte l'imagerie Wayback et les couches de source d'imagerie.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Recherche de la source de l'imagerie dans Wayback {date} : sa date de prise de vue, sa source et sa résolution seront dans la table de la nouvelle couche."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Recherche de la source de l'imagerie dans Wayback {date} : sa date de prise de vue, sa source et sa résolution seront dans la table de la nouvelle couche.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "La version {n} est plus récente que l'extension, et la liste des versions d'Esri n'a pas pu être lue."
     },
     "id": {
       "Historical Imagery": "Citra Historis",
@@ -486,7 +490,8 @@
       "No Wayback imagery on the map.": "Tidak ada citra Wayback di peta.",
       "Removed the Wayback imagery.": "Citra Wayback telah dihapus.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Hapus citra Wayback dan layer sumber citra dari peta.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Mencari sumber citra di Wayback {date}: tanggal pengambilan, sumber, dan resolusinya akan ada di tabel layer baru."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Mencari sumber citra di Wayback {date}: tanggal pengambilan, sumber, dan resolusinya akan ada di tabel layer baru.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "Rilis {n} lebih baru daripada plugin, dan daftar rilis Esri tidak dapat dibaca."
     },
     "it": {
       "Historical Imagery": "Immagini storiche",
@@ -541,7 +546,8 @@
       "No Wayback imagery on the map.": "Nessuna immagine di Wayback sulla mappa.",
       "Removed the Wayback imagery.": "Immagini di Wayback rimosse.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Rimuovi dalla mappa le immagini Wayback e i layer delle fonti delle immagini.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Ricerca della fonte delle immagini in Wayback {date}: data di acquisizione, fonte e risoluzione saranno nella tabella del nuovo layer."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Ricerca della fonte delle immagini in Wayback {date}: data di acquisizione, fonte e risoluzione saranno nella tabella del nuovo layer.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "La versione {n} è più recente del plugin e non è stato possibile leggere l'elenco delle versioni di Esri."
     },
     "ja": {
       "Historical Imagery": "過去の衛星画像",
@@ -596,7 +602,8 @@
       "No Wayback imagery on the map.": "地図上に Wayback 画像はありません。",
       "Removed the Wayback imagery.": "Wayback 画像を削除しました。",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback 画像と画像ソースのレイヤーをマップから削除します。",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} の画像ソースを検索しています。撮影日、ソース、解像度は新しいレイヤーのテーブルに表示されます。"
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} の画像ソースを検索しています。撮影日、ソース、解像度は新しいレイヤーのテーブルに表示されます。",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "リリース {n} はプラグインより新しく、Esri のリリース一覧を読み込めませんでした。"
     },
     "ko": {
       "Historical Imagery": "과거 영상",
@@ -651,7 +658,8 @@
       "No Wayback imagery on the map.": "지도에 Wayback 영상이 없습니다.",
       "Removed the Wayback imagery.": "Wayback 영상을 제거했습니다.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "지도에서 Wayback 영상과 영상 출처 레이어를 제거합니다.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date}의 영상 출처를 조회하는 중입니다. 촬영 날짜, 출처, 해상도는 새 레이어의 테이블에 표시됩니다."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date}의 영상 출처를 조회하는 중입니다. 촬영 날짜, 출처, 해상도는 새 레이어의 테이블에 표시됩니다.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "릴리스 {n}은(는) 플러그인보다 최신이며, Esri의 릴리스 목록을 읽을 수 없습니다."
     },
     "nl": {
       "Historical Imagery": "Historische beelden",
@@ -706,7 +714,8 @@
       "No Wayback imagery on the map.": "Geen Wayback-beelden op de kaart.",
       "Removed the Wayback imagery.": "De Wayback-beelden zijn verwijderd.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "De Wayback-beelden en de lagen met beeldbronnen van de kaart verwijderen.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Beeldbron in Wayback {date} wordt opgezocht: opnamedatum, bron en resolutie staan in de tabel van de nieuwe laag."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Beeldbron in Wayback {date} wordt opgezocht: opnamedatum, bron en resolutie staan in de tabel van de nieuwe laag.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "Versie {n} is nieuwer dan de plug-in, en de lijst met versies van Esri kon niet worden gelezen."
     },
     "pt": {
       "Historical Imagery": "Imagens históricas",
@@ -761,7 +770,8 @@
       "No Wayback imagery on the map.": "Nenhuma imagem do Wayback no mapa.",
       "Removed the Wayback imagery.": "As imagens do Wayback foram removidas.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Remover do mapa as imagens Wayback e as camadas de origem das imagens.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "A procurar a origem das imagens em Wayback {date}: a data de captura, a fonte e a resolução estarão na tabela da nova camada."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "A procurar a origem das imagens em Wayback {date}: a data de captura, a fonte e a resolução estarão na tabela da nova camada.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "A versão {n} é mais recente do que o plugin, e não foi possível ler a lista de versões da Esri."
     },
     "ru": {
       "Historical Imagery": "Исторические снимки",
@@ -816,7 +826,8 @@
       "No Wayback imagery on the map.": "На карте нет снимков Wayback.",
       "Removed the Wayback imagery.": "Снимки Wayback удалены.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Убрать с карты снимки Wayback и слои источников снимков.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Поиск источника снимков в Wayback {date}: дата съёмки, источник и разрешение будут в таблице нового слоя."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Поиск источника снимков в Wayback {date}: дата съёмки, источник и разрешение будут в таблице нового слоя.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "Выпуск {n} новее плагина, а список выпусков Esri не удалось прочитать."
     },
     "tr": {
       "Historical Imagery": "Tarihsel Görüntüler",
@@ -871,7 +882,8 @@
       "No Wayback imagery on the map.": "Haritada Wayback görüntüsü yok.",
       "Removed the Wayback imagery.": "Wayback görüntüsü kaldırıldı.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Wayback görüntülerini ve görüntü kaynağı katmanlarını haritadan kaldır.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} içinde görüntü kaynağı aranıyor: çekim tarihi, kaynağı ve çözünürlüğü yeni katmanın tablosunda olacak."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Wayback {date} içinde görüntü kaynağı aranıyor: çekim tarihi, kaynağı ve çözünürlüğü yeni katmanın tablosunda olacak.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "{n} sürümü eklentiden daha yeni ve Esri'nin sürüm listesi okunamadı."
     },
     "vi": {
       "Historical Imagery": "Ảnh lịch sử",
@@ -926,7 +938,8 @@
       "No Wayback imagery on the map.": "Không có ảnh Wayback trên bản đồ.",
       "Removed the Wayback imagery.": "Đã gỡ ảnh Wayback.",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "Xóa ảnh Wayback và các lớp nguồn ảnh khỏi bản đồ.",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Đang tra cứu nguồn ảnh trong Wayback {date}: ngày chụp, nguồn và độ phân giải sẽ có trong bảng của lớp mới."
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "Đang tra cứu nguồn ảnh trong Wayback {date}: ngày chụp, nguồn và độ phân giải sẽ có trong bảng của lớp mới.",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "Phiên bản {n} mới hơn plugin, và không đọc được danh sách phiên bản của Esri."
     },
     "zh": {
       "Historical Imagery": "历史影像",
@@ -981,7 +994,8 @@
       "No Wayback imagery on the map.": "地图上没有 Wayback 影像。",
       "Removed the Wayback imagery.": "已移除 Wayback 影像。",
       "Remove the Wayback imagery, and the imagery source layers, from the map.": "从地图中移除 Wayback 影像及影像来源图层。",
-      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "正在查询 Wayback {date} 中的影像来源：其拍摄日期、来源和分辨率将显示在新图层的属性表中。"
+      "Looking up the imagery source in Wayback {date}: its capture date, source and resolution will be in the new layer's table.": "正在查询 Wayback {date} 中的影像来源：其拍摄日期、来源和分辨率将显示在新图层的属性表中。",
+      "Release {n} is newer than the plugin, and Esri's list of releases couldn't be read.": "版本 {n} 比插件更新，且无法读取 Esri 的版本列表。"
     }
   }
 }
