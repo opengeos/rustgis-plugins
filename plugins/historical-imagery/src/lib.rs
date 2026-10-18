@@ -100,7 +100,9 @@ impl Releases {
                 out.list.push(r);
             }
         }
-        out.list.sort_by(|a, b| a.date.cmp(&b.date));
+        // By date, then number; a second release on a day is dropped, as dates find releases.
+        out.list.sort_by(|a, b| a.date.cmp(&b.date).then(a.num.cmp(&b.num)));
+        out.list.dedup_by(|b, a| a.date == b.date);
         out.live = true;
         found.then_some(out)
     }
@@ -237,9 +239,8 @@ fn show(req: &Request, all: &Releases, top: Option<u32>, r: &Release, add: bool)
         host::notify(&req.tr(MANIFEST, "Wayback {date} is already on the map.", &[("date", &r.date)]));
         return Ok(done);
     }
-    if let (Some(n), false) = (top, add) {
-        host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
-    }
+    // The lower copy goes first (ids are unique); the top one only once the new one is in, so a
+    // failed add keeps the imagery that was showing.
     if stacked {
         host::run("map.removeTiles", json!({"id": r.id()}))?;
     }
@@ -250,6 +251,9 @@ fn show(req: &Request, all: &Releases, top: Option<u32>, r: &Release, add: bool)
             "overlay": false, "replace": false, "id": r.id(),
         }),
     )?;
+    if let (Some(n), false) = (top, add) {
+        host::run("map.removeTiles", json!({"id": format!("{ID}{n}")}))?;
+    }
     let n = all.index(r.num).unwrap_or(0) + 1;
     host::notify(&req.tr(
         MANIFEST,
@@ -324,9 +328,16 @@ fn info(req: &Request, top: Option<u32>, release: Option<&Release>) -> Result<Va
     // The answer is the added layer's id; its one feature is the source. Added while the earlier
     // one was still there, it took a numbered name: it gets the plain one back.
     let added = out["layer"].clone();
-    let features = if added.is_null() { None } else { host::call("host.features", json!({"layer": added})).ok() };
-    if !added.is_null() {
-        host::run("layer.rename", json!({"layer": added, "name": name}))?;
+    let features = if added.is_null() {
+        None
+    } else {
+        host::call("host.features", json!({"layer": added})).map_err(|e| host::log(&format!("couldn't read the imagery source: {e}"))).ok()
+    };
+    // The name is cosmetic: a failed rename leaves the numbered one.
+    if !added.is_null()
+        && let Err(e) = host::run("layer.rename", json!({"layer": added, "name": name}))
+    {
+        host::log(&format!("couldn't rename the imagery source layer: {e}"));
     }
     let layer = name;
     let props = features.as_ref().and_then(|f| f["features"].get(0)).map(|f| f["properties"].clone());
@@ -337,7 +348,7 @@ fn info(req: &Request, top: Option<u32>, release: Option<&Release>) -> Result<Va
     let captured = p["SRC_DATE2"].as_f64().map(date_of).unwrap_or_default();
     let source =
         [p["NICE_DESC"].as_str(), p["SRC_DESC"].as_str()].into_iter().flatten().filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" ");
-    let res = p["SAMP_RES"].as_f64().map(|m| format!("{m}")).unwrap_or_default();
+    let res = p["SAMP_RES"].as_f64().map(metres).unwrap_or_default();
     host::notify(&req.tr(
         MANIFEST,
         "Captured {captured} by {source}, {res} m a pixel (in Wayback {date})",
@@ -347,6 +358,13 @@ fn info(req: &Request, top: Option<u32>, release: Option<&Release>) -> Result<Va
         "release": r.num, "date": r.date, "layer": layer,
         "source": {"captured": captured, "provider": p["NICE_DESC"], "sensor": p["SRC_DESC"], "resolution": p["SAMP_RES"], "accuracy": p["SRC_ACC"]},
     }))
+}
+
+/// A resolution in metres for a message: two decimals at most (the service keeps single-precision
+/// values, such as 0.30000001192092896).
+pub fn metres(m: f64) -> String {
+    let s = format!("{m:.2}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
 /// A date (`YYYY-MM-DD`) from milliseconds since 1970.
@@ -486,6 +504,10 @@ mod tests {
         assert_eq!(all.last(), &Release { num: 99999, date: "2100-01-15".into(), metadata: "World_Imagery_Metadata_2100_r01".into() });
         assert_eq!(all.find(15084).unwrap().metadata, "World_Imagery_Metadata_2015_r04");
         assert!(Releases::from_layers(&json!({"layers": []})).is_none());
+        // A second live release on a baked release's day is dropped.
+        let twin = Releases::from_layers(&json!({"layers": [layer("WB_2014_R99", "2014-02-20", 99998)]})).unwrap();
+        assert_eq!(twin.list.len(), RELEASES.len());
+        assert_eq!(twin.first().num, 10);
         // A name that would reach outside the metadata service's path is skipped.
         for bad in ["WB_2100_R01/../x", "WB_21a0_R01", "WB_2100_R0?f=x", "WB_2100_R"] {
             assert!(parse_layer(&layer(bad, "2100-01-15", 99999)).is_none(), "{bad}");
@@ -514,5 +536,7 @@ mod tests {
         assert!((zoom_of(559_082_264.0 / 1024.0 * 60f64.to_radians().cos(), 60.0) - 10.0).abs() < 1e-3);
         assert_eq!(date_of(1_769_990_400_000.0), "2026-02-02");
         assert_eq!(date_of(0.0), "1970-01-01");
+        assert_eq!(metres(0.300_000_011_920_928_96), "0.3");
+        assert_eq!((metres(1.0), metres(0.5), metres(15.0), metres(0.126)), ("1".into(), "0.5".into(), "15".into(), "0.13".into()));
     }
 }
