@@ -288,6 +288,17 @@ jobs:
 
             After posting inline comments, post exactly one summary comment with `gh pr comment` that starts with the heading "## Code review" and lists the findings grouped by category (Bugs, Security, Performance, Quality, CLAUDE.md), each with a one-line description and confidence. If you genuinely find nothing worth raising, say so and note what you checked.
 
+            Format the summary as multi-line Markdown: the "## Code review" heading alone on the first line, then a blank line, then each category as a bold label on its own line followed by a bulleted list. Never put findings on the heading line: GitHub renders that whole line as a heading, so the entire review shows in bold. Pass the body with real line breaks through a quoted heredoc, not `--body` with `\n` escapes:
+
+            ```
+            gh pr comment ${{ steps.pr.outputs.number }} --body-file - <<'EOF'
+            ## Code review
+
+            **Bugs**
+            - ...
+            EOF
+            ```
+
             When `.plugin-review/report.md` exists, the summary comment must also contain a "### Plugin packages" section: a table with one row per inspected plugin giving its id, version, package size, module size, permissions and module imports (copy them exactly from the report), followed by your assessment of each plugin, or the reason it could not be inspected. Findings about a package's contents cannot be inline comments (those files are not in the diff), so list them in this section.
 
             Do not approve, merge, or modify any code. Only review and comment. Do not use web fetch; use the gh CLI for all GitHub interactions.
