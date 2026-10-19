@@ -178,6 +178,67 @@ def wasm_interface(data: bytes) -> tuple[set[str], list[str]]:
     return exports, imports
 
 
+def wasm_data(data: bytes) -> bytes:
+    """Returns the bytes of a WebAssembly module's data segments (its string literals), joined."""
+    if data[:4] != b"\0asm":
+        raise ValueError("not a WebAssembly module")
+    i, out = 8, []
+    while i < len(data):
+        sid = data[i]
+        size, i = leb(data, i + 1)
+        end = i + size
+        if sid == 11:  # data
+            count, j = leb(data, i)
+            for _ in range(count):
+                flags, j = leb(data, j)
+                if flags == 2:  # explicit memory index
+                    _, j = leb(data, j)
+                if flags in (0, 2):  # offset expression: one constant instruction, then end
+                    j += 1
+                    _, j = leb(data, j)
+                    if data[j] != 0x0B:
+                        raise ValueError("unsupported data segment offset")
+                    j += 1
+                elif flags != 1:
+                    raise ValueError(f"unknown data segment kind {flags}")
+                n, j = leb(data, j)
+                out.append(data[j : j + n])
+                j += n
+        i = end
+    return b"\0".join(out)
+
+
+COMMANDS = ROOT / "scripts" / "rustgis-commands.txt"
+URL_RE = re.compile(rb"https?://[!#-~]{3,}")
+
+
+def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str]]:
+    """Returns (the RustGIS command ids, the URLs) a module's data segments name. Rust packs its
+    string literals end to end with no separator, so an id counts where no longer known id starts
+    at the same place (`layer.addData` hides `layer.add` there), and a URL may run into the
+    string after it."""
+    seg = wasm_data(data)
+    found = set()
+    for cid in known:
+        at = seg.find(cid.encode())
+        while at != -1:
+            if not any(k != cid and k.startswith(cid) and seg.startswith(k.encode(), at) for k in known):
+                found.add(cid)
+                break
+            at = seg.find(cid.encode(), at + 1)
+    urls = sorted({m.group().decode("ascii")[:200] for m in URL_RE.finditer(seg)})
+    return sorted(found), urls[:100]
+
+
+def known_commands() -> list[str]:
+    try:
+        lines = COMMANDS.read_text().splitlines()
+    except OSError:
+        return []
+    # A one-word id (`identify`) matches ordinary text too often to say anything.
+    return [ln.strip() for ln in lines if "." in ln and not ln.startswith("#")]
+
+
 # --------------------------------------------------------------------------------------------
 # Manifests and packages
 
@@ -446,9 +507,11 @@ def published(url: str) -> bytes | None:
 def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     """For code review: downloads the package each changed registry entry with a `source` points
     at, checks its SHA-256, and writes what it holds to <out>/plugins/<id>/ (plugin.json, README,
-    module interface) and a summary to <out>/report.md. Packages are read as data, never run."""
+    module interface, the commands and URLs its strings name, the module itself) and a summary to
+    <out>/report.md. Packages are read as data, never run."""
     out.mkdir(parents=True, exist_ok=True)
     rows, notes = [], []
+    known = known_commands()
     for f in files:
         try:
             reg = json.loads((checkout / f).read_text())
@@ -488,15 +551,23 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             exports, imports = wasm_interface(wasm)
         except (ValueError, IndexError) as e:
             exports, imports = set(), [f"unreadable: {e}"]
+        try:
+            commands, urls = module_strings(wasm, known)
+        except (ValueError, IndexError) as e:
+            commands, urls = [f"unreadable: {e}"], []
+        # The module itself, for the workflow to disassemble (wasm2wat) when it is small enough.
+        (dest / "module.wasm").write_bytes(wasm)
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
+            + "commands named: " + (", ".join(commands) or "none") + "\n"
+            + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
         )
         rows.append(
-            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} |"
+            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} | {', '.join(f'`{c}`' for c in commands) or 'none'} |"
         )
     report = ["# Packages this PR points at", ""]
     if rows:
-        report += ["| id | version | package | module | permissions | module imports |", "|---|---|---|---|---|---|", *rows, ""]
+        report += ["| id | version | package | module | permissions | module imports | commands named |", "|---|---|---|---|---|---|---|", *rows, ""]
     report += notes or ["All changed entries with a source were inspected."]
     (out / "report.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))

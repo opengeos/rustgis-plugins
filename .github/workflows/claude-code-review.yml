@@ -236,6 +236,29 @@ jobs:
                       "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/.plugin-review" $files)
           printf '%s\n' "$summary" >> "$GITHUB_STEP_SUMMARY"
 
+      # Turns each unpacked module of up to 1 MB into WebAssembly text (wasm2wat, from Ubuntu's
+      # wabt package) so Claude can follow its calls to rustgis.call. Larger modules keep only
+      # the interface and the strings in module.txt. The module is parsed, never run, and the
+      # step gets no token; .plugin-review/ was cleared before the trusted inspector wrote it.
+      - name: Disassemble the unpacked modules
+        if: steps.packages.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          [ -d .plugin-review/plugins ] || exit 0
+          sudo apt-get install -y -qq wabt > /dev/null
+          for wasm in .plugin-review/plugins/*/module.wasm; do
+            if [ "$(stat -c %s "$wasm")" -gt 1048576 ]; then
+              echo "$wasm: larger than 1 MB, not disassembled"
+              continue
+            fi
+            # Capped at 8 MB of text; a cut-off disassembly says so on its last line.
+            if ! timeout 60 wasm2wat "$wasm" | head -c 8388608 > "${wasm%.wasm}.wat"; then
+              echo ";; (disassembly failed or was cut off)" >> "${wasm%.wasm}.wat"
+            fi
+          done
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@cab360f6565aa35a51d6ce9e43f1f4287c0a32ea # v1.0.241
@@ -278,7 +301,7 @@ jobs:
             - Robustness: unbounded loops or output sizes (the sandbox stops runaway plugins, but a plugin should fail with a clear message rather than exhaust its budget), panics on unexpected input, and what it does with an empty or huge layer.
             - For changes to the SDK, the scripts or the workflows: correctness and security of the build, the registry generation and the checks themselves.
 
-            Packages published elsewhere: a registry/<id>.json entry with a "source" points at a .rgplugin package, so the diff shows only a URL and a SHA-256. When `.plugin-review/report.md` exists, a trusted step has already downloaded each such package, verified its SHA-256 and unpacked its plugin.json, README and module interface (`module.txt`) under `.plugin-review/plugins/<id>/`. The module is compiled WebAssembly, so its code can't be read here: review the manifest and interface, and check that the entry's `homepage`/`repository` leads to the plugin's source; if no source is reachable, raise that as a finding a maintainer must resolve before merging. Give Grep and Glob the path `.plugin-review/plugins/<id>/` explicitly, since a search from the repository root may skip that hidden folder. If the report says a package could not be inspected (download failure, hash mismatch, unreadable), raise that as a finding.
+            Packages published elsewhere: a registry/<id>.json entry with a "source" points at a .rgplugin package, so the diff shows only a URL and a SHA-256. When `.plugin-review/report.md` exists, a trusted step has already downloaded each such package, verified its SHA-256 and unpacked its plugin.json, README and module interface (`module.txt`) under `.plugin-review/plugins/<id>/`. The module is compiled WebAssembly, so its code can't be read here: review the manifest and interface, and check that the entry's `homepage`/`repository` leads to the plugin's source; if no source is reachable, raise that as a finding a maintainer must resolve before merging. Give Grep and Glob the path `.plugin-review/plugins/<id>/` explicitly, since a search from the repository root may skip that hidden folder. If the report says a package could not be inspected (download failure, hash mismatch, unreadable), raise that as a finding. `module.txt` also lists the RustGIS commands the module's strings name and the URLs it contains: check each command against the plugin's description and permissions (a "report" plugin naming `layer.remove` or a `files` command deserves a finding), and say which services the URLs point at. The list is drawn from the strings, so a command built at run time won't be in it, and a URL may run into the string after it. When `module.wat` exists it is the module disassembled to WebAssembly text: use Grep on it (for example for `call $` and the imported `rustgis.call` function index) to see where the module calls RustGIS, rather than reading it whole.
 
             The step that unpacks the packages finished with outcome `${{ steps.packages.outcome }}`. If that is `failure`, the packages of this PR were not inspected (the report may be missing or incomplete): when the diff changes any registry/<id>.json entry with a "source", raise a finding that its package could not be inspected and needs a manual review.
 
@@ -288,7 +311,7 @@ jobs:
 
             After posting inline comments, post exactly one summary comment with `gh pr comment` that starts with the heading "## Code review" and lists the findings grouped by category (Bugs, Security, Performance, Quality, CLAUDE.md), each with a one-line description and confidence. If you genuinely find nothing worth raising, say so and note what you checked.
 
-            When `.plugin-review/report.md` exists, the summary comment must also contain a "### Plugin packages" section: a table with one row per inspected plugin giving its id, version, package size, module size, permissions and module imports (copy them exactly from the report), followed by your assessment of each plugin, or the reason it could not be inspected. Findings about a package's contents cannot be inline comments (those files are not in the diff), so list them in this section.
+            When `.plugin-review/report.md` exists, the summary comment must also contain a "### Plugin packages" section: a table with one row per inspected plugin giving its id, version, package size, module size, permissions, module imports and commands named (copy them exactly from the report), followed by your assessment of each plugin, or the reason it could not be inspected. Findings about a package's contents cannot be inline comments (those files are not in the diff), so list them in this section.
 
             Do not approve, merge, or modify any code. Only review and comment. Do not use web fetch; use the gh CLI for all GitHub interactions.
 
