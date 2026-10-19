@@ -64,6 +64,10 @@ SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
 PANEL_KINDS = {"text", "checkbox", "slider", "button"}
+# RustGIS's panel limits (crates/plugins/src/panel.rs).
+PANEL_TITLE = 48
+PANEL_DECLARED = 2_000
+SLIDER_LIMIT = 1_000_000_000
 EXTENSION_RE = re.compile(r"[A-Za-z0-9]{1,16}")
 CATEGORIES = {
     "Analysis", "Basemaps", "Cartography", "Data", "Editing", "Example", "Hydrology", "Imagery",
@@ -263,7 +267,9 @@ def check_tab(m: dict, where: str) -> None:
 
 
 def check_panel(m: dict, where: str) -> None:
-    """Checks a manifest's panel: its title, and that its widgets and state name its own commands.
+    """Checks a manifest's panel as RustGIS does when it loads the plugin (`PanelDecl::validate`):
+    its title, its widgets' kinds, ids, fields and slider ranges, and that the widgets and the
+    state name the plugin's own commands.
 
     Args:
         m: The manifest.
@@ -275,9 +281,14 @@ def check_panel(m: dict, where: str) -> None:
     if not isinstance(panel, dict):
         problem(f"{where}: panel must be an object")
         return
-    if not str(panel.get("title", "")).strip():
-        problem(f"{where}: the panel needs a title")
-    commands = {c.get("id") for c in m.get("commands", [])}
+    title = panel.get("title")
+    if not isinstance(title, str) or not 1 <= len(title.strip()) <= PANEL_TITLE or "\n" in title.strip():
+        problem(f"{where}: the panel's title must be one line of 1 to {PANEL_TITLE} characters")
+    for key in ("help", "icon"):
+        if not isinstance(panel.get(key, ""), str) or len(panel.get(key, "")) > PANEL_DECLARED:
+            problem(f"{where}: the panel's {key} must be text of at most {PANEL_DECLARED} characters")
+    listed = m.get("commands", [])
+    commands = {c.get("id") for c in listed if isinstance(c, dict)} if isinstance(listed, list) else set()
     if "panel" in commands:
         problem(f"{where}: a plugin with a panel can't have a command called 'panel'")
     if "state" in panel and not (isinstance(panel["state"], str) and panel["state"] in commands):
@@ -303,6 +314,58 @@ def check_panel(m: dict, where: str) -> None:
             problem(f"{where}: two panel widgets have the id {widget!r} (a button's id is its command's unless it has one of its own)")
         else:
             seen.add(widget)
+        check_panel_item(item, kind, f"{where}: panel {kind} {widget!r}")
+
+
+def whole(v: object) -> int | None:
+    """A whole number from an integer or a float with no fraction, as RustGIS reads one."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float) and v.is_integer() and abs(v) <= SLIDER_LIMIT:
+        return int(v)
+    return None
+
+
+def check_panel_item(item: dict, kind: str, where: str) -> None:
+    """Checks a panel widget's fields: which kinds take which, and a slider's range and default.
+
+    Args:
+        item: The widget, an object with a known `kind`.
+        kind: Its kind.
+        where: The widget, for messages.
+    """
+    for key in ("label", "help", "text"):
+        if not isinstance(item.get(key, ""), str) or len(item.get(key, "")) > PANEL_DECLARED:
+            problem(f"{where}: {key} must be text of at most {PANEL_DECLARED} characters")
+            return
+    if kind == "text" and item.get("command"):
+        problem(f"{where}: a text runs no command")
+    if kind == "checkbox" and not item.get("label", "").strip():
+        problem(f"{where}: a checkbox needs a label")
+    if kind != "text" and item.get("text"):
+        problem(f"{where}: text is for texts")
+    lo, hi = item.get("min", 0), item.get("max", 0)
+    if kind != "slider":
+        if lo != 0 or hi != 0 or item.get("steps", False):
+            problem(f"{where}: min, max and steps are for sliders")
+        if "default" in item and kind != "checkbox":
+            problem(f"{where}: only checkboxes and sliders have a default")
+        elif kind == "checkbox" and "default" in item and not isinstance(item["default"], bool):
+            problem(f"{where}: a checkbox's default is true or false")
+        return
+    if not isinstance(item.get("steps", False), bool):
+        problem(f"{where}: steps is true or false")
+    if isinstance(lo, bool) or isinstance(hi, bool) or not isinstance(lo, int) or not isinstance(hi, int):
+        problem(f"{where}: a slider's min and max are whole numbers")
+        return
+    if lo > hi or lo < -SLIDER_LIMIT or hi > SLIDER_LIMIT:
+        problem(f"{where}: a slider's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
+    if "default" in item:
+        v = whole(item["default"])
+        if v is None or not lo <= v <= hi:
+            problem(f"{where}: a slider's default is a whole number from min to max")
 
 
 def check_module(wasm: bytes, where: str) -> None:
