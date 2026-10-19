@@ -1105,6 +1105,10 @@ def main() -> int:
             check_manifest(manifest, where)
             check_tab(manifest, where)
             check_panel(manifest, where)
+            if manifest.get("runtime") == "process" and how == "build":
+                # This repository builds WebAssembly: a process plugin is listed from a source.
+                problem(f"{where}: a plugin in this repository is WebAssembly; publish a process plugin elsewhere and list it by 'source'")
+                continue
             if manifest.get("runtime") == "process":
                 check_process(data, manifest, where)
             else:
