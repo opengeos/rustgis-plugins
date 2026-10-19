@@ -193,11 +193,14 @@ def wasm_data(data: bytes) -> bytes:
                 flags, j = leb(data, j)
                 if flags == 2:  # explicit memory index
                     _, j = leb(data, j)
-                if flags in (0, 2):  # offset expression: one constant instruction, then end
-                    j += 1
-                    _, j = leb(data, j)
-                    if data[j] != 0x0B:
-                        raise ValueError("unsupported data segment offset")
+                if flags in (0, 2):  # offset expression: constants, globals and arithmetic, then end
+                    while data[j] != 0x0B:
+                        op = data[j]
+                        j += 1
+                        if op in (0x23, 0x41, 0x42):  # global.get, i32.const, i64.const
+                            _, j = leb(data, j)
+                        elif op not in (0x6A, 0x6B, 0x6C, 0x7C, 0x7D, 0x7E):  # i32/i64 add, sub, mul
+                            raise ValueError(f"unsupported data segment offset instruction 0x{op:02x}")
                     j += 1
                 elif flags != 1:
                     raise ValueError(f"unknown data segment kind {flags}")
@@ -212,11 +215,14 @@ COMMANDS = ROOT / "scripts" / "rustgis-commands.txt"
 URL_RE = re.compile(rb"https?://[!#-~]{3,}")
 
 
-def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str]]:
-    """Returns (the RustGIS command ids, the URLs) a module's data segments name. Rust packs its
-    string literals end to end with no separator, so an id counts where no longer known id starts
-    at the same place (`layer.addData` hides `layer.add` there), and a URL may run into the
-    string after it."""
+MAX_URLS = 100
+
+
+def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str], int]:
+    """Returns (the RustGIS command ids, the URLs, how many URLs in all) a module's data segments
+    name. Rust packs its string literals end to end with no separator, so an id counts where no
+    longer known id starts at the same place (`layer.addData` hides `layer.add` there), and a URL
+    may run into the string after it."""
     seg = wasm_data(data)
     found = set()
     for cid in known:
@@ -227,7 +233,7 @@ def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str]]
                 break
             at = seg.find(cid.encode(), at + 1)
     urls = sorted({m.group().decode("ascii")[:200] for m in URL_RE.finditer(seg)})
-    return sorted(found), urls[:100]
+    return sorted(found), urls[:MAX_URLS], len(urls)
 
 
 def known_commands() -> list[str]:
@@ -552,18 +558,25 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         except (ValueError, IndexError) as e:
             exports, imports = set(), [f"unreadable: {e}"]
         try:
-            commands, urls = module_strings(wasm, known)
+            commands, urls, n_urls = module_strings(wasm, known)
+            named = ", ".join(commands) or "none"
+            listed = ", ".join(f"`{c}`" for c in commands) or "none"
         except (ValueError, IndexError) as e:
-            commands, urls = [f"unreadable: {e}"], []
+            urls, n_urls = [], 0
+            named = f"(the module's strings could not be read: {e})"
+            listed = "**strings unreadable**"
+            notes.append(f"- `{pid}`: the module's strings could not be read ({e}), so the commands and URLs it names are unknown")
+        if n_urls > len(urls):
+            urls.append(f"({n_urls - len(urls)} more not shown)")
         # The module itself, for the workflow to disassemble (wasm2wat) when it is small enough.
         (dest / "module.wasm").write_bytes(wasm)
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
-            + "commands named: " + (", ".join(commands) or "none") + "\n"
+            + "commands named: " + named + "\n"
             + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
         )
         rows.append(
-            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} | {', '.join(f'`{c}`' for c in commands) or 'none'} |"
+            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} | {listed} |"
         )
     report = ["# Packages this PR points at", ""]
     if rows:
