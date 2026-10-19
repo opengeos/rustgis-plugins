@@ -951,7 +951,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             py = manifest.get("python")
             runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
             run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
-            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` | n/a: read its code |")
+            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {sum(not n.endswith("/") for n in names):,} files | {perms} | runs `{run}` | n/a: read its code |")
             continue
         try:
             exports, imports = wasm_interface(wasm)
@@ -1107,10 +1107,6 @@ def main() -> int:
             check_manifest(manifest, where)
             check_tab(manifest, where)
             check_panel(manifest, where)
-            if manifest.get("runtime") == "process" and how == "build":
-                # This repository builds WebAssembly: a process plugin is listed from a source.
-                problem(f"{where}: a plugin in this repository is WebAssembly; publish a process plugin elsewhere and list it by 'source'")
-                continue
             if manifest.get("runtime") == "process":
                 check_process(data, manifest, where)
             else:
