@@ -300,7 +300,7 @@ def check_panel(m: dict, where: str) -> None:
         if not isinstance(widget, str) or not ID_RE.match(widget):
             problem(f"{where}: panel {kind} {widget!r} needs a valid id")
         elif widget in seen:
-            problem(f"{where}: two panel widgets have the id {widget!r}")
+            problem(f"{where}: two panel widgets have the id {widget!r} (a button's id is its command's unless it has one of its own)")
         else:
             seen.add(widget)
 
