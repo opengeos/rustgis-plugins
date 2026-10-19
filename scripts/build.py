@@ -887,7 +887,7 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
             target = dest / rel
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(text)
+                target.write_text(text, encoding="utf-8")
             except OSError as e:
                 lines.append(f"{name} ({how}): not unpacked ({e})")
                 continue

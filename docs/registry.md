@@ -61,7 +61,8 @@ CI checks the package's files in place of a module:
   (`windows`, `macos`, `linux`, `default`). A program named by a relative path (`bin/tool`) is
   in the package, and executable unless it is for Windows only (under `windows`, or a `.exe`,
   `.bat` or `.cmd`); the script a `python` command runs (`["python", "main.py"]`) is in the
-  package too. A full path to a program isn't accepted. The execute bit is the file's Unix mode
+  package too. A bare name (`python3`, `node`) is looked up on PATH, not in the package. A
+  full path to a program isn't accepted. The execute bit is the file's Unix mode
   in the zip: pack the package on Linux or macOS, or with a tool that keeps the mode, since a
   zip made on Windows has none.
 - `python`, when given, has a `version` like `3.12` or `3.12.4`, its `requirements` file is in
@@ -72,7 +73,7 @@ The smoke test installs the package with `rustgis-cli plugins install` (which ma
 environment with uv) and runs it on the World Atlas sample on Linux. A plugin with no program
 for Linux is skipped there, so say how you tested it in the pull request. Since CI runs a pull
 request's process plugin before it is reviewed, it does so in a job of its own, with no
-credentials, that saves and uploads nothing.
+credentials, that saves and uploads nothing. The plugin still has the runner's network there.
 
 ## What CI checks
 
