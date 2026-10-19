@@ -224,14 +224,16 @@ def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str],
     longer known id starts at the same place (`layer.addData` hides `layer.add` there), and a URL
     may run into the string after it."""
     seg = wasm_data(data)
+    longer = {cid: [k.encode() for k in known if k != cid and k.startswith(cid)] for cid in known}
     found = set()
     for cid in known:
-        at = seg.find(cid.encode())
-        while at != -1:
-            if not any(k != cid and k.startswith(cid) and seg.startswith(k.encode(), at) for k in known):
+        # Bounded, so a module repeating a longer id can't make the scan crawl.
+        at, tries = seg.find(cid.encode()), 0
+        while at != -1 and tries < 1000:
+            if not any(seg.startswith(k, at) for k in longer[cid]):
                 found.add(cid)
                 break
-            at = seg.find(cid.encode(), at + 1)
+            at, tries = seg.find(cid.encode(), at + 1), tries + 1
     urls = sorted({m.group().decode("ascii")[:200] for m in URL_RE.finditer(seg)})
     return sorted(found), urls[:MAX_URLS], len(urls)
 

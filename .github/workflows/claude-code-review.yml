@@ -165,6 +165,7 @@ jobs:
 
       # The PR head only for its registry/<id>.json entries, read as JSON.
       - name: Checkout PR head (read-only; never executed)
+        continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.pr.outputs.sha }}
@@ -173,9 +174,11 @@ jobs:
           allow-unsafe-pr-checkout: true
 
       - name: Clear paths the steps write to
+        continue-on-error: true
         run: rm -rf .review-base .plugin-review
 
       - name: Check out the base branch for the package inspector (trusted)
+        continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: .review-base
@@ -225,6 +228,7 @@ jobs:
           done
 
       - name: Hand the disassembly to the review
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: module-wat
@@ -234,8 +238,8 @@ jobs:
 
   claude-review:
     needs: disassemble
-    # The gate is on the disassemble job, whose disassembly steps can't fail it: the job
-    # fails only before it has resolved the PR, and then there is nothing to review.
+    # The gate is on the disassemble job. Every step after resolving the PR is best effort, so
+    # the job fails only when that does, and then there is nothing to review.
     if: ${{ needs.disassemble.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
