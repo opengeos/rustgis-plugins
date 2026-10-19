@@ -55,7 +55,10 @@ def clean_env(plugins_dir: str, home: str) -> dict:
     Returns:
         The environment variables.
     """
-    keep = ("PATH", "LANG", "LC_ALL", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "RUSTGIS_UV")
+    # A proxy, if the machine needs one to reach PyPI, and uv's cache, so the nightly's runs
+    # share their downloads when the caller sets one.
+    keep = ("PATH", "LANG", "LC_ALL", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "RUSTGIS_UV", "UV_CACHE_DIR")
+    keep += ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy")
     return {**{k: os.environ[k] for k in keep if k in os.environ}, "HOME": home, "RUSTGIS_PLUGINS_DIR": plugins_dir}
 
 
