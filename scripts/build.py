@@ -646,7 +646,7 @@ def check_process(data: bytes, m: dict, where: str) -> None:
                 problem(f"{where}: '{key}' names '{prog}': a program in the package needs forward slashes and no '..'")
             elif prog not in files:
                 problem(f"{where}: '{key}' runs {prog}, which isn't in the package")
-            elif platform != "windows" and not executable(files[prog]):
+            elif platform != "windows" and not prog.lower().endswith((".exe", ".bat", ".cmd")) and not executable(files[prog]):
                 problem(f"{where}: {prog} isn't executable in the package (pack it with its Unix file mode, as zip does on Linux and macOS)")
         elif prog in PYTHONS and (script := python_script(argv[1:])) is not None:
             # The script the interpreter runs, in the plugin's folder.
