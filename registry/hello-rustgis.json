@@ -1,1 +1,10 @@
-{"id": "hello-rustgis", "path": "plugins/hello", "categories": ["Example"]}
+{
+  "id": "hello-rustgis",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-official-plugins/releases/download/hello-rustgis-v0.1.2/hello-rustgis-0.1.2.rgplugin",
+    "sha256": "0a32be8db5bc4d3f9875b035e6359ce22dbc3549d0ed375f6d62d9d5d7ae77c5"
+  },
+  "categories": [
+    "Example"
+  ]
+}

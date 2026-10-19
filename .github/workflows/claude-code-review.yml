@@ -444,6 +444,7 @@ jobs:
             - Performance problems and obvious inefficiencies
             - Code quality, readability, naming, and maintainability
             - Adherence to any CLAUDE.md guidelines that apply to the changed files
+            - Scope: this repository holds registry entries, the SDK, the scripts and the site, not plugin source. A pull request that adds a plugin's source code (a new folder under `plugins/`, a crate, Python files of a plugin) instead of a `registry/<id>.json` entry pointing at a released package should get a finding asking the author to release the plugin from its own repository and submit only the entry (https://plugins.rustgis.app/registry/).
 
             About RustGIS plugins: a plugin is usually a WebAssembly module with a plugin.json manifest, packaged as a .rgplugin zip. RustGIS runs it sandboxed in an interpreter with no file, network or system access; it reaches RustGIS only through `rustgis.call` host requests (`host.layers`, `host.features`, `host.view`, `host.notify`, `host.addLayer`, and RustGIS command ids), gated by the manifest's `permissions`: `edit` (change the project) and `files` (commands that read or write files). So review plugins for:
             - Permissions: does each requested permission match what the plugin's description and code need? `files` deserves particular scrutiny: which commands does the code run with paths, and could it overwrite or read files the user didn't choose?

@@ -1,1 +1,11 @@
-{"id": "vector-toolkit", "path": "plugins/vector-toolkit", "categories": ["Vector", "Sampling"]}
+{
+  "id": "vector-toolkit",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-official-plugins/releases/download/vector-toolkit-v0.1.2/vector-toolkit-0.1.2.rgplugin",
+    "sha256": "4c483d3f7804e34d491a4baf4ebbba3ae1cd462cbd6a6a65205d27a8ca4dc5e5"
+  },
+  "categories": [
+    "Vector",
+    "Sampling"
+  ]
+}

@@ -1,1 +1,11 @@
-{"id": "historical-imagery", "path": "plugins/historical-imagery", "categories": ["Imagery", "Basemaps"]}
+{
+  "id": "historical-imagery",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-official-plugins/releases/download/historical-imagery-v0.1.1/historical-imagery-0.1.1.rgplugin",
+    "sha256": "dfe347b339b337c31de9ce675d63c8dc7d08ffce02db3e4cb9e5d28d6642920e"
+  },
+  "categories": [
+    "Imagery",
+    "Basemaps"
+  ]
+}

@@ -3,9 +3,13 @@
 The quickest start is the
 [plugin template](https://github.com/opengeos/rustgis-plugin-template): use it on GitHub
 (**Use this template**), pick a starter (commands on the Plugins tab, a tab of its own, a panel,
-or geoprocessing tools), and its workflows build, test and release your `.rgplugin`. Or copy
-[`plugins/hello`](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/hello). Plugins are written in Rust with the [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk)
-SDK, and built for `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
+or geoprocessing tools), and its workflows build, test and release your `.rgplugin`. The
+[official plugins](https://official-plugins.rustgis.app) are examples to read, starting with
+[Hello RustGIS](https://github.com/opengeos/rustgis-official-plugins/tree/main/plugins/hello).
+
+Plugins are written in Rust with the
+[`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk) SDK, and built for
+`wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 
 !!! tip "Writing it in Python?"
     A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) is a program, such as a Python script with numpy or GDAL,
@@ -60,9 +64,9 @@ mkdir -p pkg && cp plugin.json pkg/ && cp target/wasm32-unknown-unknown/release/
 
 To try it while you work, load the folder instead of a package. In RustGIS, use
 **Plugins › Plugin Manager › Settings › Add Plugin Folder…**; on the command line, use
-`rustgis-cli run --plugin ./pkg --sample --cmd 'plugin:my-plugin/hello'`. Inside this repository,
-`python scripts/build.py` (Python 3.11 or later) builds and packages every plugin into `dist/`, and
-`python scripts/smoke.py` runs them in RustGIS.
+`rustgis-cli run --plugin ./pkg --sample --cmd 'plugin:my-plugin/hello'`. The templates' scripts
+do this for you: `python scripts/package.py` builds, checks and packages the plugin into
+`dist/`, and `python scripts/smoke.py` runs it in RustGIS.
 
 ## `plugin.json`
 
@@ -195,7 +199,7 @@ translations. A string with no translation shows in English, so translations are
   and fails on a translation that drops a `{placeholder}`). `missing -o todo.json` writes the
   gaps to fill in, and `insert todo.json` adds them to the manifests.
 
-[Hello RustGIS](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/hello) translates
+[Hello RustGIS](https://github.com/opengeos/rustgis-official-plugins/tree/main/plugins/hello) translates
 its messages this way.
 
 ## A tab of its own
@@ -227,7 +231,7 @@ can hide it like any other. Declare it in `plugin.json`:
 - The label can't be the name of one of RustGIS's tabs (Map, Insert, Analysis, Plugins…). The
   `i18n` translations apply to the tab, group and menu labels too.
 
-[Map Explorer](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/map-explorer) is
+[Map Explorer](https://github.com/opengeos/rustgis-official-plugins/tree/main/plugins/map-explorer) is
 an example.
 
 ## A panel

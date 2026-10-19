@@ -1,5 +1,6 @@
 [workspace]
 resolver = "3"
+# plugins/ide-chile is built here until it moves to a repository of its own.
 members = ["sdk", "plugins/*"]
 
 [workspace.package]

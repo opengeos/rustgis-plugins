@@ -1,1 +1,11 @@
-{"id": "basemaps", "path": "plugins/basemaps", "categories": ["Basemaps", "Visualization"]}
+{
+  "id": "basemaps",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-official-plugins/releases/download/basemaps-v0.1.2/basemaps-0.1.2.rgplugin",
+    "sha256": "bd9b0817158424aa8ab6bff958067a1a4948199595097eb0ed16a4219f209cb6"
+  },
+  "categories": [
+    "Basemaps",
+    "Visualization"
+  ]
+}

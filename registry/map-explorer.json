@@ -1,1 +1,11 @@
-{"id": "map-explorer", "path": "plugins/map-explorer", "categories": ["Example", "Utilities"]}
+{
+  "id": "map-explorer",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-official-plugins/releases/download/map-explorer-v0.1.2/map-explorer-0.1.2.rgplugin",
+    "sha256": "7557b9c6f75757ee606ca41694f3e045871df1d489bce689c2cdd6ab01e9dfd9"
+  },
+  "categories": [
+    "Example",
+    "Utilities"
+  ]
+}

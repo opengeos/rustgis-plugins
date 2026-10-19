@@ -9,12 +9,13 @@
 
 Each plugin has an entry in registry/<id>.json:
 
-- a plugin in this repository names its folder: {"id": ..., "path": "plugins/<dir>"}; it is
-  built from source with cargo and packaged here.
-- a plugin hosted elsewhere names its package: {"id": ..., "source": {"url": "https://...rgplugin",
+- a plugin names its published package: {"id": ..., "source": {"url": "https://...rgplugin",
   "sha256": "..."}}; it is downloaded and checked against the hash. A process plugin
   ("runtime": "process", a program such as a Python script, not sandboxed) is listed this way
   only: its package holds its files, which are checked in place of a module.
+- the plugins in LEGACY_PATHS still name their folder here, {"id": ..., "path": "plugins/<dir>"},
+  and are built from source with cargo, until they move to a repository of their own. No other
+  plugin may: plugin source belongs in its own repository, and only registry entries here.
 
 Packages are served from packages.rustgis.app (a Cloudflare R2 bucket) at <id>/<id>-<version>.rgplugin
 and never change once published. So the build is incremental: the previous deploy's package
@@ -60,6 +61,9 @@ PACKAGES_URL = "https://packages.rustgis.app"
 INDEX_URL = "https://plugins.rustgis.app/packages.json"
 DIST = ROOT / "dist"
 TARGET = ROOT / "target" / "wasm32-unknown-unknown" / "release"
+# Plugins still built from a folder in plugins/, until they are published from a repository of
+# their own. Nothing is added here: new plugins are listed by 'source'.
+LEGACY_PATHS = {"ide-chile"}
 
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 # Versions name objects in the bucket, so only safe characters: 1.2.3, 1.2.3-beta.1, 1.2.3+build.5.
@@ -1029,6 +1033,12 @@ def main() -> int:
             if c not in CATEGORIES:
                 problem(f"{where}: unknown category '{c}' (one of {', '.join(sorted(CATEGORIES))})")
         cached = index.get(reg["id"])
+        if "path" in reg and reg["id"] not in LEGACY_PATHS:
+            problem(
+                f"{where}: a registry entry names a published package ('source'), not a folder here: keep the plugin's source in"
+                " a repository of its own and release its .rgplugin there (see https://plugins.rustgis.app/registry/)"
+            )
+            continue
         if "path" in reg:
             folder = ROOT / reg["path"]
             manifest_path = folder / "plugin.json"
@@ -1066,7 +1076,7 @@ def main() -> int:
             else:
                 plans.append((reg, where, "download", src, origin))
         else:
-            problem(f"{where}: needs a 'path' (a plugin in this repository) or a 'source' (a package hosted elsewhere)")
+            problem(f"{where}: needs a 'source': the url and sha256 of the plugin's published .rgplugin")
 
     # Build only the plugins that need it.
     to_build = [package_name(p[3]) for p in plans if p[2] == "build"]

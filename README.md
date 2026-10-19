@@ -1,34 +1,32 @@
 # RustGIS Plugins
 
-Plugins for [RustGIS](https://github.com/opengeos/RustGIS), the plugin SDK, and the plugin
-registry published at **[plugins.rustgis.app](https://plugins.rustgis.app)**.
+The plugin registry of [RustGIS](https://github.com/opengeos/RustGIS), published at
+**[plugins.rustgis.app](https://plugins.rustgis.app)**, and the plugin SDK.
 
-A RustGIS plugin is a WebAssembly module with a `plugin.json` manifest, packaged as a
-`.rgplugin` file. It adds commands, which appear on the **Plugins** tab, in command search and
-on the command line, and geoprocessing tools. It runs sandboxed in the desktop app, in
-`rustgis-cli` and in the [web app](https://web.rustgis.app). The registry also lists process
-plugins (a program, such as a Python script, that isn't sandboxed and runs on the desktop and
-the command line only; start from the
-[Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template)). See
+A RustGIS plugin is a WebAssembly module (or, for a process plugin, a program such as a Python
+script) with a `plugin.json` manifest, packaged as a `.rgplugin` file. It adds commands, ribbon
+tabs, panels and geoprocessing tools. See
 [RustGIS's plugin documentation](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md)
 for the design, the permissions and the ABI.
 
-| Folder | What |
+**This repository holds registry entries, not plugin source.** Each plugin lives in its own
+repository and releases its `.rgplugin` there; a pull request here adds or updates one file,
+`registry/<id>.json`, which points at that package and its SHA-256. Browse the plugins in the
+[catalog](https://plugins.rustgis.app/catalog/).
+
+| Where | What |
 |---|---|
-| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins (start a plugin of your own from [rustgis-plugin-template](https://github.com/opengeos/rustgis-plugin-template)) |
-| [`plugins/hello/`](plugins/hello) | **Hello RustGIS**, a starter plugin to copy: commands and a tool |
-| [`plugins/vector-toolkit/`](plugins/vector-toolkit) | **Vector Toolkit**: hexagon and square grids, random points in polygons |
-| [`plugins/basemaps/`](plugins/basemaps) | **Basemaps**: a tab of keyless public basemaps (OpenStreetMap, Esri, USGS, NASA, OpenFreeMap and VersaTiles vector maps) and overlays |
-| [`plugins/map-explorer/`](plugins/map-explorer) | **Map Explorer**: a ribbon tab of its own (groups, a menu, a tool button) for jumping around the map, selecting and summarizing |
-| [`plugins/ide-chile/`](plugins/ide-chile) | **IDE Chile**: the public geospatial services of Chile (Geoportal de Chile, IDE MINAGRI, IDE MINVU, INE Censuses 2024 and 2017) as one-click layers, map images or features, in a tab of their own |
-| [`plugins/historical-imagery/`](plugins/historical-imagery) | **Historical Imagery**: Esri's World Imagery Wayback, every archived release of World Imagery since 2014, stepped through by release or year, with the capture date and source of the imagery at any place |
-| [`registry/`](registry) | one file per listed plugin |
+| [`registry/`](registry) | one entry per listed plugin |
 | [`blocklist.json`](blocklist.json) | withdrawn plugins |
-| [`scripts/build.py`](scripts/build.py) | builds, checks and packages what changed into `dist/` |
+| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins |
+| [`scripts/build.py`](scripts/build.py) | checks the registry and its packages, and writes `dist/` |
 | [`scripts/upload.py`](scripts/upload.py) | uploads new packages to `packages.rustgis.app` |
 | [`scripts/smoke.py`](scripts/smoke.py) | runs new packages (or `--all`) in `rustgis-cli` |
 | [`scripts/preview.py`](scripts/preview.py) | makes a pull request's plugin preview from `dist/` |
 | [`docs/`](docs) | the site at plugins.rustgis.app |
+| [rustgis-plugin-template](https://github.com/opengeos/rustgis-plugin-template) | start a plugin in Rust |
+| [rustgis-python-plugin-template](https://github.com/opengeos/rustgis-python-plugin-template) | start a plugin in Python |
+| [rustgis-official-plugins](https://github.com/opengeos/rustgis-official-plugins) | the RustGIS project's own plugins ([official-plugins.rustgis.app](https://official-plugins.rustgis.app)) |
 
 ## Build
 
@@ -46,19 +44,26 @@ set **Plugins › Plugin Manager › Settings › Plugin registry** to
 
 ## Add a plugin
 
-See [Write a plugin](https://plugins.rustgis.app/develop/) and
-[Publish a plugin](https://plugins.rustgis.app/registry/). In short: open a pull request that adds
-`registry/<id>.json`, pointing either at a folder in `plugins/` or at a `.rgplugin` you publish,
-with its SHA-256.
+1. Write it in its own repository, from the
+   [Rust](https://github.com/opengeos/rustgis-plugin-template) or
+   [Python](https://github.com/opengeos/rustgis-python-plugin-template) template. See
+   [Write a plugin](https://plugins.rustgis.app/develop/).
+2. Release it: the templates' Release workflow attaches the `.rgplugin` to a GitHub release, with
+   its registry entry.
+3. Open a pull request here that adds that entry as `registry/<id>.json`. See
+   [Publish a plugin](https://plugins.rustgis.app/registry/).
+
+`plugins/ide-chile` is the last plugin still built from source here, until it moves to a
+repository of its own; `build.py` refuses a `path` entry for any other plugin.
 
 ## Deployment
 
 - **Two hosts:**
   - `plugins.rustgis.app` (GitHub Pages; the `CNAME` file, with DNS a CNAME to `opengeos.github.io`) serves the site, `registry.json`, `blocklist.json` and `packages.json`.
   - `packages.rustgis.app` serves the packages from the `rustgis-plugins` Cloudflare R2 bucket, at `<id>/<id>-<version>.rgplugin`. Packages never change once published, and every version stays available.
-- **Incremental builds:** each push to `main` builds only what changed. `scripts/build.py` reads the previous deploy's `packages.json` and builds or downloads only plugins whose version or source changed. An in-repo plugin whose files changed without a version bump fails the check.
+- **Incremental builds:** each push to `main` builds only what changed. `scripts/build.py` reads the previous deploy's `packages.json` and downloads only the packages whose source changed.
 - **Upload before deploy:** `scripts/upload.py` puts the new packages in the bucket, checking each one back, before the registry is deployed. It needs the `CLOUDFLARE_R2_TOKEN` secret (a Cloudflare API token with *Workers R2 Storage: Edit*) and `CLOUDFLARE_ACCOUNT_ID`.
 - **Previews:** each pull request's new packages are published to Cloudflare Pages (`pr-<N>.rustgis-plugins-preview.pages.dev`, the `rustgis-plugins-preview` project) by `plugin-preview.yml`, with an **Open in RustGIS** link that opens web.rustgis.app on the preview's registry (or paste the preview's `registry.json` into **Plugin Manager › Settings › Plugin registry**). The non-preview plugins are listed as published. It needs the `CLOUDFLARE_PAGES_TOKEN` secret (an API token with *Cloudflare Pages: Edit*).
-- **CI:** pull requests build and run only the plugins they change. The **Nightly** workflow runs every published plugin in the latest RustGIS.
+- **CI:** pull requests check and run only the plugins they change. The **Nightly** workflow runs every published plugin in the latest RustGIS.
 
 Code is MIT licensed. Each plugin states its own license in its `plugin.json`.

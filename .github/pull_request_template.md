@@ -1,13 +1,15 @@
-## Plugin
+<!--
+This repository lists plugins; it doesn't hold their source. A plugin pull request adds or
+updates one file, registry/<id>.json, pointing at a .rgplugin released from the plugin's own
+repository (see https://plugins.rustgis.app/registry/). Pull requests that add plugin source
+code here are closed.
+-->
 
-- Id:
-- What it does:
-- Source code (for a plugin hosted elsewhere):
-- Runtime: WebAssembly / process (not sandboxed; say how you tested it)
+**Plugin:** <!-- name, and a link to its repository -->
 
-## Checklist
+**What it does:** <!-- a sentence or two -->
 
-- [ ] `registry/<id>.json` is named after the plugin id
-- [ ] `python scripts/build.py --check` passes
-- [ ] The plugin asks only for the permissions it uses (`edit`, `files`), and its description says why
-- [ ] A new version has a new `version` in `plugin.json` (published packages never change)
+**How I tested it:** <!-- RustGIS version, desktop / web / CLI -->
+
+- [ ] The entry's `source.url` is a release asset of the plugin's repository, and `sha256` is that file's.
+- [ ] The plugin asks only for the permissions it uses.

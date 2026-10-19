@@ -1,24 +1,18 @@
 # Publish a plugin
 
 The registry is curated: plugins run inside people's RustGIS, so each one is reviewed before it
-is listed. To add yours, open a pull request on
-[opengeos/rustgis-plugins](https://github.com/opengeos/rustgis-plugins) that adds
-`registry/<id>.json`, named after the plugin's id.
+is listed. The plugin's source stays in your own repository: you release its `.rgplugin`
+there, and the registry lists it. To add yours, open a pull request on
+[opengeos/rustgis-plugins](https://github.com/opengeos/rustgis-plugins) that adds one file,
+`registry/<id>.json`, named after the plugin's id. Pull requests that add plugin source code
+here aren't accepted.
 
-## A plugin in this repository
+## Your registry entry
 
-Put its source in `plugins/<folder>/`, with `plugin.json`, `Cargo.toml` and `src/`, and add the
-folder to the workspace. Then add:
-
-```json
-{ "id": "my-plugin", "path": "plugins/my-plugin", "categories": ["Vector"] }
-```
-
-CI builds the module from source and packages it.
-
-## A plugin published elsewhere
-
-Attach a `.rgplugin` package to a release in your own repository, and add:
+Start from the [Rust template](https://github.com/opengeos/rustgis-plugin-template) or the
+[Python template](https://github.com/opengeos/rustgis-python-plugin-template): their Release
+workflow attaches the `.rgplugin` to a GitHub release and writes this entry for you. Or attach a
+`.rgplugin` package to a release in your own repository yourself, and add:
 
 ```json
 {
@@ -42,8 +36,7 @@ A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md
 module, usually a Python script, that speaks the plugin protocol over its standard input and
 output. Start from the
 [Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template), which
-packages one and attaches it to a release. List it like any plugin published elsewhere, with a
-`source`; plugins in this repository are WebAssembly only.
+packages one and attaches it to a release. List it like any other plugin, with a `source`.
 
 Process plugins are accepted, with two differences:
 
@@ -122,13 +115,11 @@ request's code, publishes only the registry and the packages.
 
 ## Updating and withdrawing
 
-Bump `version` in `plugin.json` (and `source` for a plugin hosted elsewhere). RustGIS shows an
-**Update** button to everyone with an older version. Published packages never change, so CI
-refuses an in-repository plugin whose files changed without a version bump. This covers the
-plugin's own folder (its source, `plugin.json` and README), compared with what was last
-published. A change to the shared SDK or the workspace lockfile doesn't republish existing
-versions; bump a plugin's version to ship it. Every published
-version stays available at its URL.
+Release a new version (a new `version` in `plugin.json`), then open a pull request that
+updates `source` in `registry/<id>.json` to the new release's `url` and `sha256`. RustGIS shows
+an **Update** button to everyone with an older version. Published packages never change, so
+CI refuses a different package under a version already published. Every published version
+stays available at its URL.
 
 Maintainers withdraw a plugin by adding it to `blocklist.json`. `{"id": "...", "reason": "..."}`
 blocks every version; adding `"sha256"` blocks only that package. RustGIS turns blocked plugins
