@@ -1,0 +1,8 @@
+{
+  "id": "istat-boundaries",
+  "source": {
+    "url": "https://github.com/pigreco/rustgis-istat-boundaries/releases/download/v0.3.2/istat-boundaries-0.3.2.rgplugin",
+    "sha256": "4b039867b6d2a79587a4bc50664be45bb4065d2591ad682cbbcd655dbd917613"
+  },
+  "categories": ["Data", "Vector", "Cartography"]
+}
