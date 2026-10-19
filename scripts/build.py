@@ -280,23 +280,29 @@ def check_panel(m: dict, where: str) -> None:
     commands = {c.get("id") for c in m.get("commands", [])}
     if "panel" in commands:
         problem(f"{where}: a plugin with a panel can't have a command called 'panel'")
-    if "state" in panel and panel["state"] not in commands:
+    if "state" in panel and not (isinstance(panel["state"], str) and panel["state"] in commands):
         problem(f"{where}: the panel's state {panel['state']!r} isn't one of the plugin's commands")
     items = panel.get("items")
     if not isinstance(items, list) or not 1 <= len(items) <= 32:
         problem(f"{where}: the panel needs 1 to 32 items")
         return
+    seen: set[str] = set()
     for item in items:
         kind = item.get("kind") if isinstance(item, dict) else None
         if kind not in PANEL_KINDS:
             problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
             continue
         command = item.get("command")
+        if (kind == "button" or command is not None) and not (isinstance(command, str) and command in commands):
+            problem(f"{where}: panel {kind} {item.get('id', command)!r} runs {command!r}, which isn't one of the plugin's commands")
+            continue
         widget = item.get("id", command if kind == "button" else None)
         if not isinstance(widget, str) or not ID_RE.match(widget):
             problem(f"{where}: panel {kind} {widget!r} needs a valid id")
-        if (kind == "button" or command is not None) and command not in commands:
-            problem(f"{where}: panel {kind} {widget!r} runs {command!r}, which isn't one of the plugin's commands")
+        elif widget in seen:
+            problem(f"{where}: two panel widgets have the id {widget!r}")
+        else:
+            seen.add(widget)
 
 
 def check_module(wasm: bytes, where: str) -> None:

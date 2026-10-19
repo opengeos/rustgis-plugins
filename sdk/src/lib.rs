@@ -133,9 +133,10 @@ impl Request {
         self.panel.get(id).and_then(Value::as_bool)
     }
 
-    /// A panel slider's value.
+    /// A panel slider's value (a whole number, even when written as `196.0`).
     pub fn panel_i64(&self, id: &str) -> Option<i64> {
-        self.panel.get(id).and_then(Value::as_i64)
+        let v = self.panel.get(id)?;
+        v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64))
     }
 
     /// Whether this call set the panel widget `id` (the user just moved it).
@@ -396,8 +397,9 @@ impl Panel {
         if labels.is_empty() { p } else { p.item(id, "labels", json!(labels)) }
     }
 
-    /// `answer` (the command's own answer, an object) with this state as its `panel`. Or put
-    /// `Value::from(panel)` in the answer yourself.
+    /// `answer` (the command's own answer) with this state as its `panel`. An answer that isn't
+    /// an object becomes `{"answer": answer, "panel": ...}`, and `null` just `{"panel": ...}`.
+    /// Or put `Value::from(panel)` in the answer yourself.
     pub fn answer(self, answer: Value) -> Value {
         let mut answer = match answer {
             Value::Object(m) => m,
@@ -659,8 +661,9 @@ mod tests {
     #[test]
     fn panels_values_in_and_state_out() {
         let r = Request::parse(json!({"abi": ABI, "kind": "command", "id": "go", "params": {},
-            "panel": {"values": {"local": true, "release": 196}, "changed": ["release"]}}));
+            "panel": {"values": {"local": true, "release": 196, "year": 2020.0, "half": 0.5}, "changed": ["release"]}}));
         assert_eq!((r.panel_bool("local"), r.panel_i64("release"), r.panel_i64("local")), (Some(true), Some(196), None));
+        assert_eq!((r.panel_i64("year"), r.panel_i64("half")), (Some(2020), None));
         assert!(r.changed("release") && !r.changed("local"));
         // A plugin without a panel, or an older RustGIS.
         let r = request(None);
