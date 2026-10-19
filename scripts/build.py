@@ -1035,8 +1035,8 @@ def main() -> int:
         cached = index.get(reg["id"])
         if "path" in reg and reg["id"] not in LEGACY_PATHS:
             problem(
-                f"{where}: a registry entry names a published package ('source'), not a folder here: keep the plugin's source in"
-                " a repository of its own and release its .rgplugin there (see https://plugins.rustgis.app/registry/)"
+                f"{where}: 'path' isn't allowed: plugin source doesn't live in this repository. Keep it in a repository of its own,"
+                " release its .rgplugin there and list it by 'source' (see https://plugins.rustgis.app/registry/)"
             )
             continue
         if "path" in reg:
