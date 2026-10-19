@@ -95,6 +95,28 @@ def listing_i18n(manifest: dict) -> dict:
     return out
 
 
+def runtime_fields(manifest: dict) -> dict:
+    """What a registry entry says about how the plugin runs: nothing for a WebAssembly plugin.
+
+    A process plugin's entry says `"runtime": "process"`, and `"python": "<version>"` when
+    RustGIS makes it a Python environment. Keep it in step with `build.py`'s copy: CI checks the
+    two scripts build the same entry.
+
+    Args:
+        manifest: The package's plugin.json.
+
+    Returns:
+        The fields to add to the entry.
+    """
+    if manifest.get("runtime") != "process":
+        return {}
+    out: dict = {"runtime": "process"}
+    py = manifest.get("python")
+    if isinstance(py, dict):
+        out["python"] = str(py.get("version", "3.12"))
+    return out
+
+
 def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
     """The registry entry build.py writes for a package with this manifest.
 
@@ -128,6 +150,7 @@ def entry_for(manifest: dict, e: dict, pkg: str) -> dict:
         "tools": [t.get("name", "") for t in manifest.get("tools", []) if isinstance(t, dict)],
         "tab": tab.get("label", "") if isinstance(tab := manifest.get("tab") or {}, dict) else "",
         "i18n": listing_i18n(manifest),
+        **runtime_fields(manifest),
     }
 
 
@@ -273,7 +296,9 @@ def page(pr: str, sha: str, previewed: list[dict]) -> str:
     rows = "\n".join(
         f"<li><b>{html.escape(str(e.get('name', '')))}</b> {html.escape(str(e.get('version', '')))}"
         f" <code>{html.escape(str(e.get('id', '')))}</code><br>{html.escape(str(e.get('description', '')))}"
-        f"<br><small>Permissions: {html.escape(', '.join(map(str, e.get('permissions') or [])) or 'none')}</small></li>"
+        f"<br><small>Permissions: {html.escape(', '.join(map(str, e.get('permissions') or [])) or 'none')}</small>"
+        + ("<br><small><b>Not sandboxed:</b> it runs as a program on your computer, in the desktop app and rustgis-cli only.</small>" if e.get("runtime") == "process" else "")
+        + "</li>"
         for e in previewed
     )
     repo = "https://github.com/opengeos/rustgis-plugins"

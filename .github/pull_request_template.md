@@ -3,6 +3,7 @@
 - Id:
 - What it does:
 - Source code (for a plugin hosted elsewhere):
+- Runtime: WebAssembly / process (not sandboxed; say how you tested it)
 
 ## Checklist
 

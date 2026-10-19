@@ -12,7 +12,9 @@ Each plugin has an entry in registry/<id>.json:
 - a plugin in this repository names its folder: {"id": ..., "path": "plugins/<dir>"}; it is
   built from source with cargo and packaged here.
 - a plugin hosted elsewhere names its package: {"id": ..., "source": {"url": "https://...rgplugin",
-  "sha256": "..."}}; it is downloaded and checked against the hash.
+  "sha256": "..."}}; it is downloaded and checked against the hash. A process plugin
+  ("runtime": "process", a program such as a Python script, not sandboxed) is listed this way
+  only: its package holds its files, which are checked in place of a module.
 
 Packages are served from packages.rustgis.app (a Cloudflare R2 bucket) at <id>/<id>-<version>.rgplugin
 and never change once published. So the build is incremental: the previous deploy's package
@@ -69,6 +71,15 @@ CATEGORIES = {
     "Raster", "Sampling", "Terrain", "Utilities", "Vector", "Visualization",
 }
 MAX_PACKAGE = 64 * 1024 * 1024
+# What RustGIS takes in a process plugin's package: files, unpacked size, `run` arguments.
+MAX_ENTRIES = 4096
+MAX_UNPACKED = 1024 * 1024 * 1024
+MAX_RUN_ARGS = 64
+MAX_TEXT = 2000
+RUN_PLATFORMS = ("windows", "macos", "linux", "default")
+PYTHON_VERSION_RE = re.compile(r"^3\.\d{1,3}(\.\d{1,3})?$")
+# The programs RustGIS swaps for the plugin's own environment's interpreter.
+PYTHONS = {"python", "python3", "python.exe"}
 # RustGIS's own tabs: a plugin's tab can't take their names.
 RESERVED_TABS = {
     "project", "map", "insert", "analysis", "view", "edit", "imagery", "share", "plugins", "help",
@@ -101,6 +112,28 @@ def listing_i18n(manifest: dict) -> dict:
         keep = {k: v for k in (manifest.get("name"), manifest.get("description")) if isinstance(k, str) and isinstance(v := table.get(k), str) and v.strip()}
         if keep:
             out[lang] = keep
+    return out
+
+
+def runtime_fields(manifest: dict) -> dict:
+    """What a registry entry says about how the plugin runs: nothing for a WebAssembly plugin.
+
+    A process plugin's entry says `"runtime": "process"` (not sandboxed; the desktop and the
+    command line only), and `"python": "<version>"` when RustGIS makes it a Python environment.
+    Keep it in step with `preview.py`'s copy: CI checks the two scripts build the same entry.
+
+    Args:
+        manifest: The package's plugin.json.
+
+    Returns:
+        The fields to add to the entry.
+    """
+    if manifest.get("runtime") != "process":
+        return {}
+    out: dict = {"runtime": "process"}
+    py = manifest.get("python")
+    if isinstance(py, dict):
+        out["python"] = str(py.get("version", "3.12"))
     return out
 
 
@@ -199,6 +232,13 @@ def check_manifest(m: dict, where: str) -> None:
         problem(f"{where}: homepage must be an https:// address")
     if not m.get("commands") and not m.get("tools"):
         problem(f"{where}: the plugin adds no commands and no tools")
+    runtime = m.get("runtime", "wasm")
+    if runtime not in ("wasm", "process"):
+        problem(f"{where}: runtime must be 'wasm' (the default) or 'process'")
+    if runtime != "process" and ("run" in m or "python" in m):
+        problem(f"{where}: 'run' and 'python' are for process plugins (\"runtime\": \"process\")")
+    if runtime == "process" and "entry" in m:
+        problem(f"{where}: a process plugin has no 'entry' (it names its program in 'run')")
     for c in m.get("commands", []):
         if not ID_RE.match(c.get("id", "")) or not c.get("label"):
             problem(f"{where}: command {c.get('id')!r} needs a valid id and a label")
@@ -300,11 +340,124 @@ def read_package(data: bytes, where: str) -> tuple[dict, bytes] | None:
                 problem(f"{where}: the package has no plugin.json")
                 return None
             manifest = json.loads(z.read(root + "plugin.json"))
+            # A process plugin has no module: its files are checked by check_process().
+            if isinstance(manifest, dict) and manifest.get("runtime") == "process":
+                return manifest, b""
             wasm = z.read(root + manifest.get("entry", "plugin.wasm"))
             return manifest, wasm
     except (zipfile.BadZipFile, KeyError, json.JSONDecodeError) as e:
         problem(f"{where}: unreadable package: {e}")
         return None
+
+
+def valid_path(s: object) -> bool:
+    """Whether `s` is a path inside a package as RustGIS takes one: relative, forward slashes, no `..`.
+
+    Args:
+        s: The path, from a manifest.
+
+    Returns:
+        True when it is one.
+    """
+    return (
+        isinstance(s, str)
+        and 0 < len(s) <= 256
+        and not s.startswith("/")
+        and "\\" not in s
+        and ":" not in s
+        and all(seg not in ("", ".", "..") for seg in s.split("/"))
+    )
+
+
+def executable(info: zipfile.ZipInfo) -> bool:
+    """Whether a package file is executable once unpacked (RustGIS keeps Unix file modes).
+
+    Args:
+        info: The file's entry in the package.
+
+    Returns:
+        True when it was packed from Unix with an execute bit.
+    """
+    return info.create_system == 3 and bool((info.external_attr >> 16) & 0o111)
+
+
+def check_process(data: bytes, m: dict, where: str) -> None:
+    """Checks a process plugin's package: its files, its `run` and its `python` environment.
+
+    RustGIS unpacks the package and starts `run` in that folder, so a program named by a
+    relative path (and the script a Python interpreter is given) must be in the package, and
+    the requirements file of `python` too.
+
+    Args:
+        data: The package's bytes.
+        m: Its plugin.json.
+        where: Where it came from, for messages.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            infos = z.infolist()
+    except zipfile.BadZipFile as e:
+        problem(f"{where}: unreadable package: {e}")
+        return
+    if len(infos) > MAX_ENTRIES:
+        problem(f"{where}: the package has more than {MAX_ENTRIES} files")
+    if sum(i.file_size for i in infos) > MAX_UNPACKED:
+        problem(f"{where}: the package unpacks to more than {MAX_UNPACKED >> 20} MB")
+    for i in infos:
+        n = i.filename
+        if n.startswith("/") or re.match(r"^[A-Za-z]:", n) or ".." in n.replace("\\", "/").split("/"):
+            problem(f"{where}: the package has an unsafe path: {n}")
+    names = [i.filename for i in infos]
+    root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
+    files = {i.filename[len(root) :]: i for i in infos if i.filename.startswith(root) and not i.is_dir()}
+
+    run = m.get("run")
+    if isinstance(run, list):
+        argvs = {"": run}
+    elif isinstance(run, dict) and run and set(run) <= set(RUN_PLATFORMS):
+        argvs = dict(run)
+    else:
+        problem(f"{where}: a process plugin needs 'run': its program and arguments (a list of strings), or an object of them by platform ({', '.join(RUN_PLATFORMS)})")
+        argvs = {}
+    for platform, argv in argvs.items():
+        key = f"run.{platform}" if platform else "run"
+        if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv) or not argv[0].strip():
+            problem(f"{where}: '{key}' must be a program and its arguments, a list of strings")
+            continue
+        if len(argv) > MAX_RUN_ARGS or any(len(a) > MAX_TEXT or "\0" in a for a in argv):
+            problem(f"{where}: '{key}' must be a program and at most {MAX_RUN_ARGS - 1} arguments of at most {MAX_TEXT} characters")
+        prog = argv[0]
+        if prog.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", prog):
+            problem(f"{where}: '{key}' names '{prog}': a listed plugin runs a program in its package or one on PATH, not a full path")
+        elif "/" in prog or "\\" in prog:
+            if not valid_path(prog):
+                problem(f"{where}: '{key}' names '{prog}': a program in the package needs forward slashes and no '..'")
+            elif prog not in files:
+                problem(f"{where}: '{key}' runs {prog}, which isn't in the package")
+            elif platform != "windows" and not executable(files[prog]):
+                problem(f"{where}: {prog} isn't executable in the package (pack it with its Unix file mode, as zip does on Linux and macOS)")
+        elif prog in PYTHONS and len(argv) > 1 and argv[1].endswith(".py"):
+            # The script the interpreter runs, in the plugin's folder.
+            if not valid_path(argv[1]) or argv[1] not in files:
+                problem(f"{where}: '{key}' runs {argv[1]}, which isn't in the package")
+
+    py = m.get("python")
+    if py is None:
+        return
+    if not isinstance(py, dict):
+        problem(f"{where}: python must be an object: {{\"version\": \"3.12\", \"requirements\": \"requirements.txt\"}}")
+        return
+    version = py.get("version", "3.12")
+    if not isinstance(version, str) or not PYTHON_VERSION_RE.match(version):
+        problem(f"{where}: python.version must look like 3.12 or 3.12.4")
+    req = py.get("requirements", "")
+    if not isinstance(req, str):
+        problem(f"{where}: python.requirements must be the name of a requirements file in the package")
+    elif req and (not valid_path(req) or req not in files):
+        problem(f"{where}: python.requirements names {req!r}, which isn't a file in the package")
+    # RustGIS runs the environment's interpreter in place of `python` in `run`, and only there.
+    if argvs and not any(isinstance(a, list) and a and a[0] in PYTHONS for a in argvs.values()):
+        problem(f"{where}: the plugin declares a Python environment but 'run' doesn't start python, its interpreter")
 
 
 def package_name(folder: Path) -> str:
@@ -443,10 +596,65 @@ def published(url: str) -> bytes | None:
         raise
 
 
+# What --inspect unpacks of a process plugin for review: its text files, up to these sizes.
+MAX_REVIEW_FILE = 1024 * 1024
+MAX_REVIEW = 16 * 1024 * 1024
+
+
+def unpack_for_review(data: bytes, dest: Path) -> list[str]:
+    """Writes a process plugin's text files (its code) under `dest`, for review; never runs them.
+
+    Only files under the package's plugin.json, by paths inside the package (no `..`, nothing
+    absolute), that are UTF-8 text, at most MAX_REVIEW_FILE each and MAX_REVIEW in all. Every
+    file is listed, with its size and whether it is executable, so binaries show up too.
+
+    Args:
+        data: The package's bytes.
+        dest: The folder to write to (`<out>/plugins/<id>/files`).
+
+    Returns:
+        The listing: one line per file in the package.
+    """
+    lines, total = [], 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        infos = [i for i in z.infolist() if not i.is_dir()]
+        names = [i.filename for i in infos]
+        root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
+        for i in infos:
+            rel = i.filename[len(root) :] if i.filename.startswith(root) else None
+            how = ("executable, " if executable(i) else "") + f"{i.file_size:,} B"
+            if rel is None or not valid_path(rel):
+                lines.append(f"{i.filename} ({how}): not unpacked (outside the plugin's folder, or an unsafe path)")
+                continue
+            if i.file_size > MAX_REVIEW_FILE or total + i.file_size > MAX_REVIEW:
+                lines.append(f"{rel} ({how}): not unpacked (too large to review here)")
+                continue
+            # The header's size is the package's say-so: read at most what it claims.
+            with z.open(i) as f:
+                body = f.read(MAX_REVIEW_FILE + 1)
+            try:
+                if len(body) > MAX_REVIEW_FILE or "\0" in (text := body.decode("utf-8")):
+                    raise ValueError
+            except ValueError:
+                lines.append(f"{rel} ({how}): binary, not unpacked")
+                continue
+            target = dest / rel
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text)
+            except OSError as e:
+                lines.append(f"{rel} ({how}): not unpacked ({e})")
+                continue
+            total += len(body)
+            lines.append(f"{rel} ({how})")
+    return lines
+
+
 def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     """For code review: downloads the package each changed registry entry with a `source` points
     at, checks its SHA-256, and writes what it holds to <out>/plugins/<id>/ (plugin.json, README,
-    module interface) and a summary to <out>/report.md. Packages are read as data, never run."""
+    and the module interface, or a process plugin's files) and a summary to <out>/report.md.
+    Packages are read as data, never run."""
     out.mkdir(parents=True, exist_ok=True)
     rows, notes = [], []
     for f in files:
@@ -484,6 +692,16 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
             if readme:
                 (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
+        perms = ", ".join(map(str, manifest.get("permissions", []))) or "none"
+        if manifest.get("runtime") == "process":
+            # Not sandboxed, and its code is readable: unpack it for review.
+            listing = unpack_for_review(data, dest / "files")
+            (dest / "files.txt").write_text("\n".join(listing) + "\n")
+            py = manifest.get("python")
+            runtime = "process (not sandboxed)" + (f", Python {py.get('version', '3.12')}" if isinstance(py, dict) else "")
+            run = json.dumps(manifest.get("run"), ensure_ascii=False).replace("|", "\\|").replace("`", "'")
+            rows.append(f"| `{pid}` | {manifest.get('version')} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` |")
+            continue
         try:
             exports, imports = wasm_interface(wasm)
         except (ValueError, IndexError) as e:
@@ -491,12 +709,15 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
         )
-        rows.append(
-            f"| `{pid}` | {manifest.get('version')} | {len(data):,} B | {len(wasm):,} B | {', '.join(manifest.get('permissions', [])) or 'none'} | {', '.join(imports) or 'none'} |"
-        )
+        rows.append(f"| `{pid}` | {manifest.get('version')} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} |")
     report = ["# Packages this PR points at", ""]
     if rows:
-        report += ["| id | version | package | module | permissions | module imports |", "|---|---|---|---|---|---|", *rows, ""]
+        report += [
+            "| id | version | runtime | package | module | permissions | module imports |",
+            "|---|---|---|---|---|---|---|",
+            *rows,
+            "",
+        ]
     report += notes or ["All changed entries with a source were inspected."]
     (out / "report.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))
@@ -548,6 +769,9 @@ def main() -> int:
                 version = str(json.loads(manifest_path.read_text()).get("version", ""))
             except (OSError, json.JSONDecodeError) as e:
                 problem(f"{where}: {reg['path']}/plugin.json: {e}")
+                continue
+            if json.loads(manifest_path.read_text()).get("runtime") == "process":
+                problem(f"{where}: plugins in this repository are WebAssembly; publish a process plugin as a package elsewhere and list it by 'source'")
                 continue
             tree = tree_hash(folder)
             origin = {"path": reg["path"], "tree": tree}
@@ -608,7 +832,10 @@ def main() -> int:
             manifest, wasm = read
             check_manifest(manifest, where)
             check_tab(manifest, where)
-            check_module(wasm, where)
+            if manifest.get("runtime") == "process":
+                check_process(data, manifest, where)
+            else:
+                check_module(wasm, where)
             if manifest.get("id") != reg["id"]:
                 problem(f"{where}: the package's id is '{manifest.get('id')}'")
                 continue
@@ -665,6 +892,7 @@ def main() -> int:
                 "tools": [t.get("name", "") for t in manifest.get("tools", [])],
                 "tab": (manifest.get("tab") or {}).get("label", ""),
                 "i18n": listing_i18n(manifest),
+                **runtime_fields(manifest),
             }
         )
     print(f"{len(new)} new packages, {len(entries) - len(new)} already published")

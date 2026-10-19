@@ -6,7 +6,10 @@ registry published at **[plugins.rustgis.app](https://plugins.rustgis.app)**.
 A RustGIS plugin is a WebAssembly module with a `plugin.json` manifest, packaged as a
 `.rgplugin` file. It adds commands, which appear on the **Plugins** tab, in command search and
 on the command line, and geoprocessing tools. It runs sandboxed in the desktop app, in
-`rustgis-cli` and in the [web app](https://web.rustgis.app). See
+`rustgis-cli` and in the [web app](https://web.rustgis.app). The registry also lists process
+plugins (a program, such as a Python script, that isn't sandboxed and runs on the desktop and
+the command line only; start from the
+[Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template)). See
 [RustGIS's plugin documentation](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md)
 for the design, the permissions and the ABI.
 

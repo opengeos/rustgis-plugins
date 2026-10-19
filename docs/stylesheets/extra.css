@@ -95,6 +95,15 @@
   color: var(--md-accent-fg-color);
 }
 
+/* A process plugin: a program on the user's computer, not sandboxed. */
+.md-typeset .plugin-card-perms .plugin-perm-unsandboxed {
+  color: #fff;
+  background: #c62828;
+  border-radius: 0.2rem;
+  padding: 0 0.3rem;
+  font-weight: 600;
+}
+
 .md-typeset .plugin-card-tags {
   margin: 0.4rem 0 0;
 }

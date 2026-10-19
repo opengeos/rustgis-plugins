@@ -4,6 +4,12 @@ Copy [`plugins/hello`](https://github.com/opengeos/rustgis-plugins/tree/main/plu
 to start. Plugins are written in Rust with the [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk)
 SDK, and built for `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 
+!!! tip "Writing it in Python?"
+    A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) is a program, such as a Python script with numpy or GDAL,
+    instead of a module. It isn't sandboxed and runs on the desktop and the command line only.
+    Start from the [Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template), and see
+    [A process plugin](registry.md#a-process-plugin-python) for how it is listed.
+
 ```toml
 [lib]
 crate-type = ["cdylib"]

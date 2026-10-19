@@ -36,13 +36,47 @@ from `packages.rustgis.app/my-plugin/my-plugin-<version>.rgplugin` with that has
 edits to your release don't change what people install. A new version needs a new `version` and
 a new `source`.
 
+## A process plugin (Python)
+
+A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) (`"runtime": "process"`) is a program instead of a WebAssembly
+module, usually a Python script, that speaks the plugin protocol over its standard input and
+output. Start from the
+[Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template), which
+packages one and attaches it to a release. List it like any plugin published elsewhere, with a
+`source`; plugins in this repository are WebAssembly only.
+
+Process plugins are accepted, with two differences:
+
+- **They are not sandboxed.** The program can do anything its user can, whatever its
+  permissions, so it is reviewed more strictly: the reviewer reads all of its code (every file
+  in the package), its requirements and what it runs. Keep the package to source and data you
+  can explain; a prebuilt executable needs a link to its source. The
+  catalog and RustGIS's Plugin Manager mark it **Not sandboxed**.
+- **They run on the desktop and the command line only**, not in the web app (or a preview's
+  **Open in RustGIS** link: try one in the desktop app instead).
+
+CI checks the package's files in place of a module:
+
+- `run` is a program and its arguments (a list of strings), or an object of them by platform
+  (`windows`, `macos`, `linux`, `default`). A program named by a relative path (`bin/tool`) is
+  in the package, and executable unless it is for Windows only; the script a `python` command
+  runs (`["python", "main.py"]`) is in the package too. A full path to a program isn't accepted.
+- `python`, when given, has a `version` like `3.12` or `3.12.4`, its `requirements` file is in
+  the package, and `run` starts `python`, which RustGIS swaps for the environment's interpreter.
+- There is no `entry`, the package holds at most 4,096 files, and they unpack to at most 1 GB.
+
+The smoke test installs the package with `rustgis-cli plugins install` (which makes its Python
+environment with uv) and runs it on the World Atlas sample on Linux. A plugin with no program
+for Linux is only loaded from its manifest; say how you tested it in the pull request.
+
 ## What CI checks
 
 `python scripts/build.py --check` checks:
 
 - the manifest: id, version, permissions, commands, tools and parameter kinds;
 - that the module exports what RustGIS needs and imports nothing else (no WASI, no
-  JavaScript glue);
+  JavaScript glue), or, for a [process plugin](#a-process-plugin-python), its `run`, `python`
+  and files;
 - that the package's id matches its registry file.
 
 It writes `dist/registry.json`. Then `python scripts/smoke.py` loads every package into the real
@@ -50,7 +84,7 @@ It writes `dist/registry.json`. Then `python scripts/smoke.py` loads every packa
 
 An automated Claude Code review also comments on each pull request: on the permissions, the
 commands the plugin runs and its manifest, and, for a package published elsewhere, on what the
-package holds. A first-time contributor's pull request is reviewed once a maintainer comments
+package holds (all the code of a process plugin). A first-time contributor's pull request is reviewed once a maintainer comments
 `/claude-review` or adds the `claude-review` label. A maintainer still reviews every plugin
 before it is merged.
 
@@ -100,7 +134,9 @@ off and refuses to install them again. Report a malicious plugin privately (see
 Each entry has `id`, `name`, `version`, `description`, `author`, `homepage`, `license`,
 `categories`, `package` (the package's URL on `packages.rustgis.app`), `sha256`, `size`,
 `minRustgisVersion`, `permissions`, the labels of its `commands`, the names of its `tools` and
-its `tab`.
+its `tab`. A process plugin's entry also has `"runtime": "process"`, and `"python"` (the Python
+version, such as `"3.12"`) when RustGIS makes it a Python environment; a WebAssembly plugin's
+entry has neither.
 
 `packages.json` beside it is the build's index: each plugin's package, full manifest and where it
 came from. The next build reads it to rebuild only what changed.

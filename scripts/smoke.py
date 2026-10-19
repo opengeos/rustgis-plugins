@@ -8,6 +8,11 @@ For each plugin: RustGIS must load it and list its commands; each tool runs with
 (layer parameters get a sample layer of the right kind) and must succeed; each command that
 needs no parameters runs too (a failure there is reported but doesn't fail the check, since a
 command may need a selection or a layer the sample doesn't have).
+
+A process plugin ("runtime": "process") runs from its unpacked files, so it is installed into a
+scratch plugins folder first (`rustgis-cli plugins install`, which also makes its Python
+environment with uv: this downloads Python and its packages), run as installed, and uninstalled.
+One that doesn't run on Linux is only loaded from its manifest.
 """
 
 from __future__ import annotations
@@ -32,12 +37,60 @@ SAMPLE = {"polygonLayer": "Countries", "pointLayer": "Cities", "vectorLayer": "C
 FIELDS = {"field": "name", "numericField": "pop_est"}
 
 
-def run(cli: str, package: Path, cmds: list[str], plugins_dir: str) -> subprocess.CompletedProcess:
-    args = [cli, "run", "--no-plugins", "--plugin", str(package), "--sample"]
+# Installing a process plugin can download Python and its packages.
+INSTALL_TIMEOUT = 1800
+
+
+def run(cli: str, package: Path, cmds: list[str], plugins_dir: str, installed: bool = False) -> subprocess.CompletedProcess:
+    """Runs commands in rustgis-cli on the sample, with the plugin loaded.
+
+    Args:
+        cli: The rustgis-cli program.
+        package: The plugin's package.
+        cmds: The commands to run, in order.
+        plugins_dir: The scratch plugins folder.
+        installed: The plugin is installed in `plugins_dir` (a process plugin): load the
+            installed plugins rather than the package.
+
+    Returns:
+        The finished process.
+    """
+    args = [cli, "run", "--sample"] if installed else [cli, "run", "--no-plugins", "--plugin", str(package), "--sample"]
     for c in cmds:
         args += ["--cmd", c]
     env = dict(os.environ, RUSTGIS_PLUGINS_DIR=plugins_dir)
     return subprocess.run(args, capture_output=True, text=True, timeout=600, env=env)
+
+
+def plugins(cli: str, args: list[str], plugins_dir: str) -> subprocess.CompletedProcess:
+    """Runs `rustgis-cli plugins <args>` on the scratch plugins folder.
+
+    Args:
+        cli: The rustgis-cli program.
+        args: The subcommand and its argument (`install <file>`, `uninstall <id>`).
+        plugins_dir: The scratch plugins folder.
+
+    Returns:
+        The finished process.
+    """
+    env = dict(os.environ, RUSTGIS_PLUGINS_DIR=plugins_dir)
+    try:
+        return subprocess.run([cli, "plugins", *args], capture_output=True, text=True, timeout=INSTALL_TIMEOUT, env=env)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(args, 1, "", f"it took more than {INSTALL_TIMEOUT // 60} minutes")
+
+
+def runs_on_linux(manifest: dict) -> bool:
+    """Whether a process plugin's `run` names a program for Linux (its own, or the default).
+
+    Args:
+        manifest: The plugin's plugin.json.
+
+    Returns:
+        True when it does.
+    """
+    run = manifest.get("run")
+    return isinstance(run, list) or (isinstance(run, dict) and bool(run.get("linux") or run.get("default")))
 
 
 def main() -> int:
@@ -81,49 +134,81 @@ def main() -> int:
                 package.write_bytes(data)
             ran += 1
             print(f"== {e['id']} {e['version']}")
-            listed = run(args.cli, package, ["info.commands"], plugins_dir)
-            if listed.returncode != 0:
-                print(f"error: RustGIS couldn't load it:\n{listed.stderr}")
-                failures += 1
-                continue
-            ids = {c["id"] for c in json.loads(listed.stdout)}
-
             with zipfile.ZipFile(package) as z:
                 root = "" if "plugin.json" in z.namelist() else next(n[: -len("plugin.json")] for n in z.namelist() if n.endswith("/plugin.json"))
                 manifest = json.loads(z.read(root + "plugin.json"))
-            for c in manifest.get("commands", []):
-                cid = f"plugin:{e['id']}/{c['id']}"
-                if cid not in ids:
-                    print(f"error: {cid} isn't listed")
+            process = manifest.get("runtime") == "process"
+            if process:
+                if not runs_on_linux(manifest):
+                    print("   skipped: a process plugin with no program for Linux (its manifest loaded; run it on its platforms by hand)")
+                    continue
+                # It runs from its unpacked files, installed (with its Python environment) here.
+                got = plugins(args.cli, ["install", str(package)], plugins_dir)
+                if got.returncode != 0:
+                    print(f"error: RustGIS couldn't install it:\n{got.stderr}")
                     failures += 1
                     continue
-                if c.get("params", "{}") not in ("{}", "") and ":" in c.get("params", "") and "?" not in c.get("params", ""):
-                    continue
-                r = run(args.cli, package, [cid], plugins_dir)
-                print(f"   command {c['id']}: {'ok' if r.returncode == 0 else 'failed (allowed): ' + r.stderr.strip()}")
-            for t in manifest.get("tools", []):
-                params, skip = {}, False
-                for p in t.get("params", []):
-                    if p["kind"] in SAMPLE:
-                        params[p["name"]] = SAMPLE[p["kind"]]
-                    elif p["kind"] in FIELDS:
-                        params[p["name"]] = FIELDS[p["kind"]]
-                    elif p.get("required") and "default" not in p:
-                        skip = True
-                if skip:
-                    print(f"   tool {t['id']}: skipped (a required parameter has no default)")
-                    continue
-                cmd = "gp.run=" + json.dumps({"tool": f"plugin:{e['id']}/{t['id']}", "params": params})
-                r = run(args.cli, package, [cmd], plugins_dir)
-                if r.returncode == 0:
-                    print(f"   tool {t['id']}: ok")
-                else:
-                    print(f"error: tool {t['id']} failed: {r.stderr.strip()}")
-                    failures += 1
+            try:
+                failures += exercise(args.cli, package, e["id"], manifest, plugins_dir, process)
+            finally:
+                if process:
+                    plugins(args.cli, ["uninstall", e["id"]], plugins_dir)
     if ran == 0:
         print("no new packages to run" if not args.all else "no packages in this shard")
     print(f"{ran} plugins run, {failures} failures")
     return 1 if failures else 0
+
+
+def exercise(cli: str, package: Path, pid: str, manifest: dict, plugins_dir: str, installed: bool) -> int:
+    """Loads a plugin in rustgis-cli and runs its commands and tools on the sample.
+
+    Args:
+        cli: The rustgis-cli program.
+        package: The plugin's package.
+        pid: The plugin's id.
+        manifest: Its plugin.json.
+        plugins_dir: The scratch plugins folder.
+        installed: It is installed there (a process plugin) rather than loaded from the package.
+
+    Returns:
+        The number of failures.
+    """
+    failures = 0
+    listed = run(cli, package, ["info.commands"], plugins_dir, installed)
+    if listed.returncode != 0:
+        print(f"error: RustGIS couldn't load it:\n{listed.stderr}")
+        return 1
+    ids = {c["id"] for c in json.loads(listed.stdout)}
+    for c in manifest.get("commands", []):
+        cid = f"plugin:{pid}/{c['id']}"
+        if cid not in ids:
+            print(f"error: {cid} isn't listed")
+            failures += 1
+            continue
+        if c.get("params", "{}") not in ("{}", "") and ":" in c.get("params", "") and "?" not in c.get("params", ""):
+            continue
+        r = run(cli, package, [cid], plugins_dir, installed)
+        print(f"   command {c['id']}: {'ok' if r.returncode == 0 else 'failed (allowed): ' + r.stderr.strip()}")
+    for t in manifest.get("tools", []):
+        params, skip = {}, False
+        for p in t.get("params", []):
+            if p["kind"] in SAMPLE:
+                params[p["name"]] = SAMPLE[p["kind"]]
+            elif p["kind"] in FIELDS:
+                params[p["name"]] = FIELDS[p["kind"]]
+            elif p.get("required") and "default" not in p:
+                skip = True
+        if skip:
+            print(f"   tool {t['id']}: skipped (a required parameter has no default)")
+            continue
+        cmd = "gp.run=" + json.dumps({"tool": f"plugin:{pid}/{t['id']}", "params": params})
+        r = run(cli, package, [cmd], plugins_dir, installed)
+        if r.returncode == 0:
+            print(f"   tool {t['id']}: ok")
+        else:
+            print(f"error: tool {t['id']} failed: {r.stderr.strip()}")
+            failures += 1
+    return failures
 
 
 if __name__ == "__main__":

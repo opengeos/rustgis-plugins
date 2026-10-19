@@ -186,6 +186,10 @@ def render_page(entry: dict, manifest: dict) -> str:
         rows.append(("License", text(entry["license"])))
     if entry.get("minRustgisVersion"):
         rows.append(("Requires", f"RustGIS {text(entry['minRustgisVersion'])} or newer"))
+    process = entry.get("runtime") == "process"
+    if process:
+        python = f", in a Python {text(entry['python'])} environment RustGIS makes for it" if entry.get("python") else ""
+        rows.append(("Runs", f"as a program on your computer{python}: the desktop app and the command line only, not the web app"))
     if tags(entry.get("categories") or []):
         rows.append(("Categories", tags(entry["categories"])))
     rows.append(("Package", f"{size(int(entry.get('size', 0)))}, SHA-256 `{entry.get('sha256', '')}`"))
@@ -195,10 +199,20 @@ def render_page(entry: dict, manifest: dict) -> str:
     body += [" ".join(buttons), "", *(f"- **{k}:** {v}" for k, v in rows), ""]
 
     body += ["## Permissions", ""]
+    if process:
+        body += [
+            '!!! warning "Not sandboxed"',
+            "    This plugin is a program that runs on your computer, not in RustGIS's sandbox: it can do anything you can, "
+            "whatever its permissions. Its permissions only decide which requests RustGIS answers. It was reviewed before "
+            "it was listed; install it if you trust its author.",
+            "",
+        ]
     perms = [p for p in entry.get("permissions") or [] if p in PERMISSIONS]
     body += ["- **Reads the map:** its layers, their features and the view. Every plugin can."]
     body += [f"- **{PERMISSIONS[p][0]}:** {PERMISSIONS[p][1]}" for p in perms]
-    body += ["", "Plugins run in a sandbox with no other access to your computer or the network.", ""]
+    if not process:
+        body += ["", "Plugins run in a sandbox with no other access to your computer or the network."]
+    body += [""]
 
     commands = manifest.get("commands") or []
     tab = manifest.get("tab") or {}
@@ -240,8 +254,10 @@ def render_page(entry: dict, manifest: dict) -> str:
     body += [
         "## Install",
         "",
-        "- **In RustGIS** (desktop or [web](https://web.rustgis.app)): open **Plugins › Plugin Manager › Browse**, find "
-        f"**{text(name)}** and choose **Install**. RustGIS checks the download against the SHA-256 above.",
+        ("- **In RustGIS** (desktop): " if process else "- **In RustGIS** (desktop or [web](https://web.rustgis.app)): ")
+        + f"open **Plugins › Plugin Manager › Browse**, find **{text(name)}** and choose **Install**. "
+        + "RustGIS checks the download against the SHA-256 above."
+        + (" It then makes the plugin's Python environment, which downloads Python and its packages the first time." if entry.get("python") and process else ""),
         f"- **On the command line:** `rustgis-cli plugins get {pid}`.",
         "- **From the file:** download the package, then choose **Plugins › Install From File** in RustGIS or run "
         "`rustgis-cli plugins install <file>`.",

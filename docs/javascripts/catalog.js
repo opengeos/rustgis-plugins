@@ -99,6 +99,13 @@
     li.append(el("span", "plugin-card-meta", meta.join(" · ")));
     const perms = arr(p.permissions).filter((x) => PERMISSIONS[x]);
     const permLine = el("span", "plugin-card-perms");
+    // A process plugin is a program on the user's computer: said first.
+    if (p.runtime === "process") {
+      const s = el("span", "plugin-perm plugin-perm-unsandboxed", "Not sandboxed");
+      s.title = "Runs as a program on your computer and can do anything you can. Desktop app and command line only.";
+      permLine.append(s);
+      if (perms.length) permLine.append(" · ");
+    }
     if (perms.length) {
       perms.forEach((x, i) => {
         const s = el("span", "plugin-perm", PERMISSIONS[x][0]);
@@ -106,7 +113,7 @@
         if (i) permLine.append(" · ");
         permLine.append(s);
       });
-    } else {
+    } else if (p.runtime !== "process") {
       const s = el("span", "plugin-perm plugin-perm-read", "Reads the map only");
       s.title = "Only reads the map.";
       permLine.append(s);
