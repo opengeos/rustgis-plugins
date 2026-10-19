@@ -642,6 +642,8 @@ def check_process(data: bytes, m: dict, where: str) -> None:
         if prog.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", prog):
             problem(f"{where}: '{key}' names '{prog}': a listed plugin runs a program in its package or one on PATH, not a full path")
         elif "/" in prog or "\\" in prog:
+            # Relative to the plugin's folder, where RustGIS starts it: `./run.sh` is `run.sh`.
+            prog = prog.removeprefix("./")
             if not valid_path(prog):
                 problem(f"{where}: '{key}' names '{prog}': a program in the package needs forward slashes and no '..'")
             elif prog not in files:
