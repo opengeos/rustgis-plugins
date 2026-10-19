@@ -67,6 +67,11 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
+PANEL_KINDS = {"text", "checkbox", "slider", "button"}
+# RustGIS's panel limits (crates/plugins/src/panel.rs).
+PANEL_TITLE = 48
+PANEL_DECLARED = 2_000
+SLIDER_LIMIT = 1_000_000_000
 EXTENSION_RE = re.compile(r"[A-Za-z0-9]{1,16}")
 CATEGORIES = {
     "Analysis", "Basemaps", "Cartography", "Data", "Editing", "Example", "Hydrology", "Imagery",
@@ -213,6 +218,77 @@ def wasm_interface(data: bytes) -> tuple[set[str], list[str]]:
     return exports, imports
 
 
+def wasm_data(data: bytes) -> bytes:
+    """Returns the bytes of a WebAssembly module's data segments (its string literals), joined."""
+    if data[:4] != b"\0asm":
+        raise ValueError("not a WebAssembly module")
+    i, out = 8, []
+    while i < len(data):
+        sid = data[i]
+        size, i = leb(data, i + 1)
+        end = i + size
+        if sid == 11:  # data
+            count, j = leb(data, i)
+            for _ in range(count):
+                flags, j = leb(data, j)
+                if flags == 2:  # explicit memory index
+                    _, j = leb(data, j)
+                if flags in (0, 2):  # offset expression: constants, globals and arithmetic, then end
+                    while data[j] != 0x0B:
+                        op = data[j]
+                        j += 1
+                        if op in (0x23, 0x41, 0x42):  # global.get, i32.const, i64.const
+                            _, j = leb(data, j)
+                        elif op not in (0x6A, 0x6B, 0x6C, 0x7C, 0x7D, 0x7E):  # i32/i64 add, sub, mul
+                            raise ValueError(f"unsupported data segment offset instruction 0x{op:02x}")
+                    j += 1
+                elif flags != 1:
+                    raise ValueError(f"unknown data segment kind {flags}")
+                n, j = leb(data, j)
+                out.append(data[j : j + n])
+                j += n
+        i = end
+    return b"\0".join(out)
+
+
+COMMANDS = ROOT / "scripts" / "rustgis-commands.txt"
+URL_RE = re.compile(rb"https?://[!#-~]{3,}")
+
+
+MAX_URLS = 100
+
+
+def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str], int]:
+    """Returns (the RustGIS command ids, the URLs, how many URLs in all) a module's data segments
+    name. Rust packs its string literals end to end with no separator, so an id counts where no
+    longer known id starts at the same place (`layer.addData` hides `layer.add` there), and a URL
+    may run into the string after it."""
+    seg = wasm_data(data)
+    longer = {cid: [k.encode() for k in known if k != cid and k.startswith(cid)] for cid in known}
+    found = set()
+    for cid in known:
+        # Bounded, so a module repeating a longer id can't make the scan crawl; one that hits the
+        # bound counts as naming the id, so the repeats can't hide it either.
+        at, tries = seg.find(cid.encode()), 0
+        while at != -1:
+            if tries == 1000 or not any(seg.startswith(k, at) for k in longer[cid]):
+                found.add(cid)
+                break
+            at, tries = seg.find(cid.encode(), at + 1), tries + 1
+    urls = sorted({m.group().decode("ascii")[:200] for m in URL_RE.finditer(seg)})
+    return sorted(found), urls[:MAX_URLS], len(urls)
+
+
+def known_commands() -> list[str]:
+    try:
+        lines = COMMANDS.read_text().splitlines()
+    except OSError:
+        return []
+    # A one-word id (`identify`) matches ordinary text too often to say anything.
+    stripped = (ln.strip() for ln in lines)
+    return [ln for ln in stripped if "." in ln and not ln.startswith("#")]
+
+
 # --------------------------------------------------------------------------------------------
 # Manifests and packages
 
@@ -280,9 +356,11 @@ def check_tab(m: dict, where: str) -> None:
     tools = {t.get("id") for t in m.get("tools", [])}
 
     def entry(e: object) -> None:
-        ok = isinstance(e, str) and (e[5:] in tools if e.startswith("tool:") else e in commands)
+        ok = isinstance(e, str) and (
+            e[5:] in tools if e.startswith("tool:") else e in commands or (e == "panel" and isinstance(m.get("panel"), dict))
+        )
         if not ok:
-            problem(f"{where}: the tab names {e!r}, which isn't one of the plugin's commands or tools (tool:<id>)")
+            problem(f"{where}: the tab names {e!r}, which isn't one of the plugin's commands or tools (tool:<id>) or its panel")
 
     groups = tab.get("groups") or []
     if not 1 <= len(groups) <= 8:
@@ -299,6 +377,108 @@ def check_tab(m: dict, where: str) -> None:
                     entry(e)
             else:
                 entry(item)
+
+
+def check_panel(m: dict, where: str) -> None:
+    """Checks a manifest's panel as RustGIS does when it loads the plugin (`PanelDecl::validate`):
+    its title, its widgets' kinds, ids, fields and slider ranges, and that the widgets and the
+    state name the plugin's own commands.
+
+    Args:
+        m: The manifest.
+        where: Where it came from, for messages.
+    """
+    panel = m.get("panel")
+    if panel is None:
+        return
+    if not isinstance(panel, dict):
+        problem(f"{where}: panel must be an object")
+        return
+    title = panel.get("title")
+    if not isinstance(title, str) or not 1 <= len(title.strip()) <= PANEL_TITLE or "\n" in title.strip():
+        problem(f"{where}: the panel's title must be one line of 1 to {PANEL_TITLE} characters")
+    for key in ("help", "icon"):
+        if not isinstance(panel.get(key, ""), str) or len(panel.get(key, "")) > PANEL_DECLARED:
+            problem(f"{where}: the panel's {key} must be text of at most {PANEL_DECLARED} characters")
+    listed = m.get("commands", [])
+    commands = {c.get("id") for c in listed if isinstance(c, dict)} if isinstance(listed, list) else set()
+    if "panel" in commands:
+        problem(f"{where}: a plugin with a panel can't have a command called 'panel'")
+    if "state" in panel and not (isinstance(panel["state"], str) and panel["state"] in commands):
+        problem(f"{where}: the panel's state {panel['state']!r} isn't one of the plugin's commands")
+    items = panel.get("items")
+    if not isinstance(items, list) or not 1 <= len(items) <= 32:
+        problem(f"{where}: the panel needs 1 to 32 items")
+        return
+    seen: set[str] = set()
+    for item in items:
+        kind = item.get("kind") if isinstance(item, dict) else None
+        if not isinstance(kind, str) or kind not in PANEL_KINDS:
+            problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
+            continue
+        command = item.get("command")
+        if (kind == "button" or command is not None) and not (isinstance(command, str) and command in commands):
+            problem(f"{where}: panel {kind} {item.get('id', command)!r} runs {command!r}, which isn't one of the plugin's commands")
+            continue
+        widget = item.get("id", command if kind == "button" else None)
+        if not isinstance(widget, str) or not ID_RE.match(widget):
+            problem(f"{where}: panel {kind} {widget!r} needs a valid id")
+        elif widget in seen:
+            problem(f"{where}: two panel widgets have the id {widget!r} (a button's id is its command's unless it has one of its own)")
+        else:
+            seen.add(widget)
+        check_panel_item(item, kind, f"{where}: panel {kind} {widget!r}")
+
+
+def whole(v: object) -> int | None:
+    """A whole number from an integer or a float with no fraction, as RustGIS reads one."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float) and v.is_integer() and abs(v) <= SLIDER_LIMIT:
+        return int(v)
+    return None
+
+
+def check_panel_item(item: dict, kind: str, where: str) -> None:
+    """Checks a panel widget's fields: which kinds take which, and a slider's range and default.
+
+    Args:
+        item: The widget, an object with a known `kind`.
+        kind: Its kind.
+        where: The widget, for messages.
+    """
+    for key in ("label", "help", "text"):
+        if not isinstance(item.get(key, ""), str) or len(item.get(key, "")) > PANEL_DECLARED:
+            problem(f"{where}: {key} must be text of at most {PANEL_DECLARED} characters")
+            return
+    if kind == "text" and item.get("command"):
+        problem(f"{where}: a text runs no command")
+    if kind == "checkbox" and not item.get("label", "").strip():
+        problem(f"{where}: a checkbox needs a label")
+    if kind != "text" and item.get("text"):
+        problem(f"{where}: text is for texts")
+    lo, hi = item.get("min", 0), item.get("max", 0)
+    if kind != "slider":
+        if lo != 0 or hi != 0 or item.get("steps", False):
+            problem(f"{where}: min, max and steps are for sliders")
+        if "default" in item and kind != "checkbox":
+            problem(f"{where}: only checkboxes and sliders have a default")
+        elif kind == "checkbox" and "default" in item and not isinstance(item["default"], bool):
+            problem(f"{where}: a checkbox's default is true or false")
+        return
+    if not isinstance(item.get("steps", False), bool):
+        problem(f"{where}: steps is true or false")
+    if isinstance(lo, bool) or isinstance(hi, bool) or not isinstance(lo, int) or not isinstance(hi, int):
+        problem(f"{where}: a slider's min and max are whole numbers")
+        return
+    if lo > hi or lo < -SLIDER_LIMIT or hi > SLIDER_LIMIT:
+        problem(f"{where}: a slider's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
+    if "default" in item:
+        v = whole(item["default"])
+        if v is None or not lo <= v <= hi:
+            problem(f"{where}: a slider's default is a whole number from min to max")
 
 
 def check_module(wasm: bytes, where: str) -> None:
@@ -717,10 +897,12 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
 def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     """For code review: downloads the package each changed registry entry with a `source` points
     at, checks its SHA-256, and writes what it holds to <out>/plugins/<id>/ (plugin.json, README,
-    and the module interface, or a process plugin's files) and a summary to <out>/report.md.
-    Packages are read as data, never run."""
+    and the module interface, the commands and URLs its strings name and the module itself, or a
+    process plugin's files) and a summary to <out>/report.md. Packages are read as data, never
+    run."""
     out.mkdir(parents=True, exist_ok=True)
     rows, notes = [], []
+    known = known_commands()
     for f in files:
         try:
             reg = json.loads((checkout / f).read_text())
@@ -767,21 +949,40 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             py = manifest.get("python")
             runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
             run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
-            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` |")
+            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` | n/a: read its code |")
             continue
         try:
             exports, imports = wasm_interface(wasm)
         except (ValueError, IndexError) as e:
             exports, imports = set(), [f"unreadable: {e}"]
+        try:
+            commands, urls, n_urls = module_strings(wasm, known)
+            named = ", ".join(commands) or "none"
+            listed = ", ".join(f"`{c}`" for c in commands) or "none"
+            if not known:
+                named = listed = f"unknown: the command list {COMMANDS.name} is missing or empty"
+        except (ValueError, IndexError) as e:
+            urls, n_urls = [], 0
+            named = f"(the module's strings could not be read: {e})"
+            listed = "**strings unreadable**"
+            notes.append(f"- `{pid}`: the module's strings could not be read ({e}), so the commands and URLs it names are unknown")
+        if n_urls > len(urls):
+            urls.append(f"({n_urls - len(urls)} more not shown)")
+        # The module itself, for the workflow to disassemble (wasm2wat) when it is small enough.
+        (dest / "module.wasm").write_bytes(wasm)
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
+            + "commands named in strings (not those built at run time): " + named + "\n"
+            + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
         )
-        rows.append(f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} |")
+        rows.append(
+            f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} | {listed} |"
+        )
     report = ["# Packages this PR points at", ""]
     if rows:
         report += [
-            "| id | version | runtime | package | module | permissions | module imports |",
-            "|---|---|---|---|---|---|---|",
+            "| id | version | runtime | package | module | permissions | module imports | commands named in strings |",
+            "|---|---|---|---|---|---|---|---|",
             *rows,
             "",
         ]
@@ -880,6 +1081,7 @@ def main() -> int:
             # Rules added since it was published apply to it too.
             check_manifest(manifest, where)
             check_tab(manifest, where)
+            check_panel(manifest, where)
         else:
             if how == "build":
                 wasm_path = TARGET / f"{crate_name(what)}.wasm"
@@ -902,6 +1104,7 @@ def main() -> int:
             manifest, wasm = read
             check_manifest(manifest, where)
             check_tab(manifest, where)
+            check_panel(manifest, where)
             if manifest.get("runtime") == "process":
                 check_process(data, manifest, where)
             else:
