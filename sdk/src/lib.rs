@@ -88,6 +88,12 @@ pub struct Request {
     pub files: Map<String, Value>,
     /// The interface language's code (`en`, `de`, `zh`…): word messages in it with [`Request::tr`].
     pub lang: String,
+    /// For a plugin with a panel: its widgets' values, by widget id (a checkbox's `true` or
+    /// `false`, a slider's whole number), whatever ran the command. Empty otherwise. Read one
+    /// with [`Request::panel_bool`] or [`Request::panel_i64`].
+    pub panel: Map<String, Value>,
+    /// The panel widgets this call set: the one the user just moved, or those a script gave.
+    pub panel_changed: Vec<String>,
 }
 
 impl Request {
@@ -99,6 +105,16 @@ impl Request {
             _ => Map::new(),
         };
         let (layers, files) = (take_map("layers"), take_map("files"));
+        let panel = v.get("panel");
+        let panel_values = match panel.and_then(|p| p.get("values")) {
+            Some(Value::Object(m)) => m.clone(),
+            _ => Map::new(),
+        };
+        let panel_changed = panel
+            .and_then(|p| p.get("changed"))
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
+            .unwrap_or_default();
         Request {
             kind,
             id: v.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
@@ -107,7 +123,24 @@ impl Request {
             files,
             // RustGIS older than the `lang` field speaks English.
             lang: v.get("lang").and_then(Value::as_str).unwrap_or("en").to_string(),
+            panel: panel_values,
+            panel_changed,
         }
+    }
+
+    /// A panel checkbox's value.
+    pub fn panel_bool(&self, id: &str) -> Option<bool> {
+        self.panel.get(id).and_then(Value::as_bool)
+    }
+
+    /// A panel slider's value.
+    pub fn panel_i64(&self, id: &str) -> Option<i64> {
+        self.panel.get(id).and_then(Value::as_i64)
+    }
+
+    /// Whether this call set the panel widget `id` (the user just moved it).
+    pub fn changed(&self, id: &str) -> bool {
+        self.panel_changed.iter().any(|c| c == id)
     }
 
     /// `s` in the interface language, from the `i18n` table of the plugin's `plugin.json`
@@ -310,6 +343,69 @@ impl From<ToolOutput> for Value {
         m.insert("tables".into(), Value::Array(o.tables));
         m.insert("messages".into(), o.messages.into_iter().map(Value::String).collect());
         Value::Object(m)
+    }
+}
+
+/// A panel's new state, which any command of a plugin with a panel can answer beside the rest
+/// of its answer. What it leaves out stays as it was.
+///
+/// ```ignore
+/// let panel = Panel::new().value("year", 2020).text("summary", "3 layers").enabled("older", false);
+/// Ok(json!({"year": 2020, "panel": panel}))
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct Panel {
+    values: Map<String, Value>,
+    items: Map<String, Value>,
+}
+
+impl Panel {
+    pub fn new() -> Panel {
+        Panel::default()
+    }
+
+    /// Sets a checkbox (`true`/`false`) or a slider (a whole number).
+    pub fn value(mut self, id: &str, value: impl Into<Value>) -> Panel {
+        self.values.insert(id.into(), value.into());
+        self
+    }
+
+    /// Sets the text a `text` widget shows.
+    pub fn text(self, id: &str, text: impl Into<String>) -> Panel {
+        self.item(id, "text", Value::String(text.into()))
+    }
+
+    /// Sets a widget's label; `None` brings back the one `plugin.json` declares.
+    pub fn label(self, id: &str, label: Option<&str>) -> Panel {
+        self.item(id, "label", label.map_or(Value::Null, Value::from))
+    }
+
+    /// Turns a widget on or off.
+    pub fn enabled(self, id: &str, enabled: bool) -> Panel {
+        self.item(id, "enabled", Value::Bool(enabled))
+    }
+
+    /// Shows or hides a widget.
+    pub fn visible(self, id: &str, visible: bool) -> Panel {
+        self.item(id, "visible", Value::Bool(visible))
+    }
+
+    /// Sets a slider's ends and, when `labels` isn't empty, a label for each value from `min`.
+    pub fn slider(self, id: &str, min: i64, max: i64, labels: &[String]) -> Panel {
+        let p = self.item(id, "min", json!(min)).item(id, "max", json!(max));
+        if labels.is_empty() { p } else { p.item(id, "labels", json!(labels)) }
+    }
+
+    fn item(mut self, id: &str, field: &str, value: Value) -> Panel {
+        let item = self.items.entry(id.to_string()).or_insert_with(|| json!({}));
+        item[field] = value;
+        self
+    }
+}
+
+impl From<Panel> for Value {
+    fn from(p: Panel) -> Value {
+        json!({"values": p.values, "items": p.items})
     }
 }
 
@@ -546,6 +642,33 @@ mod tests {
             assert_eq!(base64_decode(b64).as_deref(), Some(plain.as_bytes()), "{b64}");
         }
         assert_eq!(base64_decode("+/+/").unwrap(), vec![0xfb, 0xff, 0xbf]);
+    }
+
+    #[test]
+    fn panels_values_in_and_state_out() {
+        let r = Request::parse(json!({"abi": ABI, "kind": "command", "id": "go", "params": {},
+            "panel": {"values": {"local": true, "release": 196}, "changed": ["release"]}}));
+        assert_eq!((r.panel_bool("local"), r.panel_i64("release"), r.panel_i64("local")), (Some(true), Some(196), None));
+        assert!(r.changed("release") && !r.changed("local"));
+        // A plugin without a panel, or an older RustGIS.
+        let r = request(None);
+        assert!(r.panel.is_empty() && r.panel_changed.is_empty());
+
+        let p: Value = Panel::new()
+            .value("release", 3)
+            .text("selected", "2025")
+            .enabled("newer", false)
+            .slider("release", 0, 3, &["a".into(), "b".into(), "c".into(), "d".into()])
+            .label("selected", None)
+            .into();
+        assert_eq!(
+            p,
+            json!({"values": {"release": 3}, "items": {
+                "selected": {"text": "2025", "label": null},
+                "newer": {"enabled": false},
+                "release": {"min": 0, "max": 3, "labels": ["a", "b", "c", "d"]}
+            }})
+        );
     }
 
     #[test]

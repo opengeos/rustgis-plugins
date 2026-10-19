@@ -12,7 +12,7 @@ for the design, the permissions and the ABI.
 
 | Folder | What |
 |---|---|
-| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins |
+| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins (start a plugin of your own from [rustgis-plugin-template](https://github.com/opengeos/rustgis-plugin-template)) |
 | [`plugins/hello/`](plugins/hello) | **Hello RustGIS**, a starter plugin to copy: commands and a tool |
 | [`plugins/vector-toolkit/`](plugins/vector-toolkit) | **Vector Toolkit**: hexagon and square grids, random points in polygons |
 | [`plugins/basemaps/`](plugins/basemaps) | **Basemaps**: a tab of keyless public basemaps (OpenStreetMap, Esri, USGS, NASA, OpenFreeMap and VersaTiles vector maps) and overlays |

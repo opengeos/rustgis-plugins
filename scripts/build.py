@@ -63,6 +63,7 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
+PANEL_KINDS = {"text", "checkbox", "slider", "button"}
 EXTENSION_RE = re.compile(r"[A-Za-z0-9]{1,16}")
 CATEGORIES = {
     "Analysis", "Basemaps", "Cartography", "Data", "Editing", "Example", "Hydrology", "Imagery",
@@ -238,9 +239,11 @@ def check_tab(m: dict, where: str) -> None:
     tools = {t.get("id") for t in m.get("tools", [])}
 
     def entry(e: object) -> None:
-        ok = isinstance(e, str) and (e[5:] in tools if e.startswith("tool:") else e in commands)
+        ok = isinstance(e, str) and (
+            e[5:] in tools if e.startswith("tool:") else e in commands or (e == "panel" and isinstance(m.get("panel"), dict))
+        )
         if not ok:
-            problem(f"{where}: the tab names {e!r}, which isn't one of the plugin's commands or tools (tool:<id>)")
+            problem(f"{where}: the tab names {e!r}, which isn't one of the plugin's commands or tools (tool:<id>) or its panel")
 
     groups = tab.get("groups") or []
     if not 1 <= len(groups) <= 8:
@@ -257,6 +260,43 @@ def check_tab(m: dict, where: str) -> None:
                     entry(e)
             else:
                 entry(item)
+
+
+def check_panel(m: dict, where: str) -> None:
+    """Checks a manifest's panel: its title, and that its widgets and state name its own commands.
+
+    Args:
+        m: The manifest.
+        where: Where it came from, for messages.
+    """
+    panel = m.get("panel")
+    if panel is None:
+        return
+    if not isinstance(panel, dict):
+        problem(f"{where}: panel must be an object")
+        return
+    if not str(panel.get("title", "")).strip():
+        problem(f"{where}: the panel needs a title")
+    commands = {c.get("id") for c in m.get("commands", [])}
+    if "panel" in commands:
+        problem(f"{where}: a plugin with a panel can't have a command called 'panel'")
+    if "state" in panel and panel["state"] not in commands:
+        problem(f"{where}: the panel's state {panel['state']!r} isn't one of the plugin's commands")
+    items = panel.get("items")
+    if not isinstance(items, list) or not 1 <= len(items) <= 32:
+        problem(f"{where}: the panel needs 1 to 32 items")
+        return
+    for item in items:
+        kind = item.get("kind") if isinstance(item, dict) else None
+        if kind not in PANEL_KINDS:
+            problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
+            continue
+        command = item.get("command")
+        widget = item.get("id", command if kind == "button" else None)
+        if not isinstance(widget, str) or not ID_RE.match(widget):
+            problem(f"{where}: panel {kind} {widget!r} needs a valid id")
+        if (kind == "button" or command is not None) and command not in commands:
+            problem(f"{where}: panel {kind} {widget!r} runs {command!r}, which isn't one of the plugin's commands")
 
 
 def check_module(wasm: bytes, where: str) -> None:
@@ -586,6 +626,7 @@ def main() -> int:
             # Rules added since it was published apply to it too.
             check_manifest(manifest, where)
             check_tab(manifest, where)
+            check_panel(manifest, where)
         else:
             if how == "build":
                 wasm_path = TARGET / f"{crate_name(what)}.wasm"
@@ -608,6 +649,7 @@ def main() -> int:
             manifest, wasm = read
             check_manifest(manifest, where)
             check_tab(manifest, where)
+            check_panel(manifest, where)
             check_module(wasm, where)
             if manifest.get("id") != reg["id"]:
                 problem(f"{where}: the package's id is '{manifest.get('id')}'")

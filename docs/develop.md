@@ -1,7 +1,10 @@
 # Write a plugin
 
-Copy [`plugins/hello`](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/hello)
-to start. Plugins are written in Rust with the [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk)
+The quickest start is the
+[plugin template](https://github.com/opengeos/rustgis-plugin-template): use it on GitHub
+(**Use this template**), pick a starter (commands on the Plugins tab, a tab of its own, a panel,
+or geoprocessing tools), and its workflows build, test and release your `.rgplugin`. Or copy
+[`plugins/hello`](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/hello). Plugins are written in Rust with the [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk)
 SDK, and built for `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 
 ```toml
@@ -220,6 +223,42 @@ can hide it like any other. Declare it in `plugin.json`:
 
 [Map Explorer](https://github.com/opengeos/rustgis-plugins/tree/main/plugins/map-explorer) is
 an example.
+
+## A panel
+
+A plugin can have a panel: a pane on the right of the map with texts, checkboxes, sliders and
+buttons bound to its commands. Its button comes first in the plugin's group on the **Plugins**
+tab; on a tab of its own, put `panel` among a group's items. Panels need a RustGIS newer than
+0.3.0, which ignores them (keep the commands usable from the ribbon too).
+
+```json
+"panel": {
+  "title": "Year Picker",
+  "icon": "history",
+  "help": "Pick a year.",
+  "state": "panel-state",
+  "items": [
+    { "kind": "text", "id": "summary", "label": "Summary" },
+    { "kind": "checkbox", "id": "visible-only", "label": "Visible layers only", "command": "panel-state" },
+    { "kind": "slider", "id": "year", "label": "Year", "min": 2000, "max": 2025, "steps": true, "command": "pick-year" },
+    { "kind": "button", "command": "reset" }
+  ]
+}
+```
+
+RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
+read them with `req.panel_bool("visible-only")` and `req.panel_i64("year")` (`req.changed("year")`
+says whether this call set it), and answer the panel's new state with a `Panel`:
+
+```rust
+use rustgis_plugin::Panel;
+
+let panel = Panel::new().value("year", 2020).text("summary", "3 layers").enabled("reset", true);
+Ok(json!({"year": 2020, "panel": panel}))
+```
+
+See [A panel](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#a-panel) in
+RustGIS's documentation for every widget and field.
 
 ## What a plugin can ask for
 
