@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from collections import Counter
 import io
 import json
 import re
@@ -48,6 +47,7 @@ import urllib.error
 import urllib.request
 import zipfile
 import zlib
+from collections import Counter
 from pathlib import Path
 
 if sys.version_info < (3, 11):
@@ -397,13 +397,14 @@ def python_script(args: list[str]) -> str | None:
     for a in args:
         if skip:
             skip = False
+        elif a.startswith(("-W", "-X")):
+            # An option with a value, attached (`-Wignore`, `-Xutf8`) or next (`-W ignore`).
+            skip = a in ("-W", "-X")
         elif a.startswith("-") and not a.startswith("--") and ("m" in a or "c" in a):
             # A module or a command (`-m pkg`, `-um pkg`, `-c code`), or a short option cluster
             # that may hold one: nothing to check. (Long options, `--check-hash-based-pycs`, are
             # skipped below.)
             return None
-        elif a in ("-W", "-X"):
-            skip = True  # an option with a value
         elif a == "-" or not a.startswith("-"):
             return None if a == "-" else a
     return None

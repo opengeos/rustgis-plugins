@@ -76,7 +76,11 @@ def run(cli: str, package: Path, cmds: list[str], env: dict, installed: bool = F
     args = [cli, "run", "--sample"] if installed else [cli, "run", "--no-plugins", "--plugin", str(package), "--sample"]
     for c in cmds:
         args += ["--cmd", c]
-    return subprocess.run(args, capture_output=True, text=True, timeout=600, env=env)
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=600, env=env)
+    except subprocess.TimeoutExpired:
+        # A plugin that hangs fails its own check, and the others still run.
+        return subprocess.CompletedProcess(args, 1, "", "it timed out after 10 minutes")
 
 
 def plugins(cli: str, args: list[str], env: dict) -> subprocess.CompletedProcess:
