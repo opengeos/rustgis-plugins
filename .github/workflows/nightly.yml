@@ -8,6 +8,10 @@ on:
     - cron: "30 6 * * *"
   workflow_dispatch:
 
+# It runs process plugins, which aren't sandboxed: a read-only token.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 

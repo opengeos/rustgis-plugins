@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# The smoke test runs process plugins, which aren't sandboxed, from unmerged pull requests:
+# they get a read-only token and no secrets.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

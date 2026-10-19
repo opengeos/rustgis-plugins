@@ -12,7 +12,7 @@ command may need a selection or a layer the sample doesn't have).
 A process plugin ("runtime": "process") runs from its unpacked files, so it is installed into a
 scratch plugins folder first (`rustgis-cli plugins install`, which also makes its Python
 environment with uv: this downloads Python and its packages), run as installed, and uninstalled.
-One that doesn't run on Linux is only loaded from its manifest.
+One with no program for Linux is skipped (RustGIS can't load it here; build.py checks its files).
 """
 
 from __future__ import annotations
@@ -138,17 +138,17 @@ def main() -> int:
                 root = "" if "plugin.json" in z.namelist() else next(n[: -len("plugin.json")] for n in z.namelist() if n.endswith("/plugin.json"))
                 manifest = json.loads(z.read(root + "plugin.json"))
             process = manifest.get("runtime") == "process"
-            if process:
-                if not runs_on_linux(manifest):
-                    print("   skipped: a process plugin with no program for Linux (its manifest loaded; run it on its platforms by hand)")
-                    continue
-                # It runs from its unpacked files, installed (with its Python environment) here.
-                got = plugins(args.cli, ["install", str(package)], plugins_dir)
-                if got.returncode != 0:
+            if process and not runs_on_linux(manifest):
+                # RustGIS won't load it here at all; build.py checked its manifest and files.
+                print("   skipped: a process plugin with no program for Linux, which RustGIS can't run here (run it on its platforms by hand)")
+                continue
+            try:
+                # A process plugin runs from its unpacked files: installed (with its Python
+                # environment) here, and removed after, even when the install half worked.
+                if process and (got := plugins(args.cli, ["install", str(package)], plugins_dir)).returncode != 0:
                     print(f"error: RustGIS couldn't install it:\n{got.stderr}")
                     failures += 1
                     continue
-            try:
                 failures += exercise(args.cli, package, e["id"], manifest, plugins_dir, process)
             finally:
                 if process:

@@ -381,6 +381,29 @@ def executable(info: zipfile.ZipInfo) -> bool:
     return info.create_system == 3 and bool((info.external_attr >> 16) & 0o111)
 
 
+def python_script(args: list[str]) -> str | None:
+    """The script a Python interpreter is given in `args` (its arguments), if any.
+
+    Args:
+        args: The interpreter's arguments, from `run`.
+
+    Returns:
+        The first argument that isn't an option, or None when there is none or the interpreter
+        runs a module or a command instead (`-m`, `-c`).
+    """
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+        elif a in ("-m", "-c") or a.startswith(("-m", "-c")) and not a.startswith("--"):
+            return None
+        elif a in ("-W", "-X"):
+            skip = True  # an option with a value
+        elif a == "-" or not a.startswith("-"):
+            return None if a == "-" else a
+    return None
+
+
 def check_process(data: bytes, m: dict, where: str) -> None:
     """Checks a process plugin's package: its files, its `run` and its `python` environment.
 
@@ -436,10 +459,10 @@ def check_process(data: bytes, m: dict, where: str) -> None:
                 problem(f"{where}: '{key}' runs {prog}, which isn't in the package")
             elif platform != "windows" and not executable(files[prog]):
                 problem(f"{where}: {prog} isn't executable in the package (pack it with its Unix file mode, as zip does on Linux and macOS)")
-        elif prog in PYTHONS and len(argv) > 1 and argv[1].endswith(".py"):
+        elif prog in PYTHONS and (script := python_script(argv[1:])) is not None:
             # The script the interpreter runs, in the plugin's folder.
-            if not valid_path(argv[1]) or argv[1] not in files:
-                problem(f"{where}: '{key}' runs {argv[1]}, which isn't in the package")
+            if not valid_path(script.removeprefix("./")) or script.removeprefix("./") not in files:
+                problem(f"{where}: '{key}' runs {script}, which isn't in the package")
 
     py = m.get("python")
     if py is None:
@@ -601,6 +624,18 @@ MAX_REVIEW_FILE = 1024 * 1024
 MAX_REVIEW = 16 * 1024 * 1024
 
 
+def cell(value: object) -> str:
+    """Package text for a cell of the review report's table: one line, with `|` escaped.
+
+    Args:
+        value: Text from a manifest.
+
+    Returns:
+        The cell's text.
+    """
+    return " ".join(str(value).split()).replace("|", "\\|")
+
+
 def unpack_for_review(data: bytes, dest: Path) -> list[str]:
     """Writes a process plugin's text files (its code) under `dest`, for review; never runs them.
 
@@ -622,12 +657,14 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
         root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
         for i in infos:
             rel = i.filename[len(root) :] if i.filename.startswith(root) else None
+            # Names are the package's say-so: quoted, so one can't pass for lines of its own.
+            name = json.dumps(rel if rel is not None else i.filename, ensure_ascii=False)
             how = ("executable, " if executable(i) else "") + f"{i.file_size:,} B"
             if rel is None or not valid_path(rel):
-                lines.append(f"{i.filename} ({how}): not unpacked (outside the plugin's folder, or an unsafe path)")
+                lines.append(f"{name} ({how}): not unpacked (outside the plugin's folder, or an unsafe path)")
                 continue
             if i.file_size > MAX_REVIEW_FILE or total + i.file_size > MAX_REVIEW:
-                lines.append(f"{rel} ({how}): not unpacked (too large to review here)")
+                lines.append(f"{name} ({how}): not unpacked (too large to review here)")
                 continue
             # The header's size is the package's say-so: read at most what it claims.
             with z.open(i) as f:
@@ -636,17 +673,17 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
                 if len(body) > MAX_REVIEW_FILE or "\0" in (text := body.decode("utf-8")):
                     raise ValueError
             except ValueError:
-                lines.append(f"{rel} ({how}): binary, not unpacked")
+                lines.append(f"{name} ({how}): binary, not unpacked")
                 continue
             target = dest / rel
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(text)
             except OSError as e:
-                lines.append(f"{rel} ({how}): not unpacked ({e})")
+                lines.append(f"{name} ({how}): not unpacked ({e})")
                 continue
             total += len(body)
-            lines.append(f"{rel} ({how})")
+            lines.append(f"{name} ({how})")
     return lines
 
 
@@ -692,15 +729,17 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
             if readme:
                 (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
-        perms = ", ".join(map(str, manifest.get("permissions", []))) or "none"
+        # The manifest's text goes into a table: one line, no cell breaks.
+        version = cell(manifest.get("version"))
+        perms = cell(", ".join(map(str, manifest.get("permissions", []))) or "none")
         if manifest.get("runtime") == "process":
             # Not sandboxed, and its code is readable: unpack it for review.
             listing = unpack_for_review(data, dest / "files")
             (dest / "files.txt").write_text("\n".join(listing) + "\n")
             py = manifest.get("python")
-            runtime = "process (not sandboxed)" + (f", Python {py.get('version', '3.12')}" if isinstance(py, dict) else "")
-            run = json.dumps(manifest.get("run"), ensure_ascii=False).replace("|", "\\|").replace("`", "'")
-            rows.append(f"| `{pid}` | {manifest.get('version')} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` |")
+            runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
+            run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
+            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {len(listing)} files | {perms} | runs `{run}` |")
             continue
         try:
             exports, imports = wasm_interface(wasm)
@@ -709,7 +748,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
         )
-        rows.append(f"| `{pid}` | {manifest.get('version')} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} |")
+        rows.append(f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} |")
     report = ["# Packages this PR points at", ""]
     if rows:
         report += [
