@@ -42,15 +42,32 @@ FIELDS = {"field": "name", "numericField": "pop_est"}
 INSTALL_TIMEOUT = 1800
 
 
-def run(cli: str, package: Path, cmds: list[str], plugins_dir: str, installed: bool = False) -> subprocess.CompletedProcess:
+def clean_env(plugins_dir: str, home: str) -> dict:
+    """The environment RustGIS and the plugins it runs get: little of the caller's.
+
+    A process plugin is a program that isn't sandboxed, so it sees only what running needs, not
+    the CI job's variables.
+
+    Args:
+        plugins_dir: The scratch plugins folder.
+        home: A scratch home folder.
+
+    Returns:
+        The environment variables.
+    """
+    keep = ("PATH", "LANG", "LC_ALL", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "RUSTGIS_UV")
+    return {**{k: os.environ[k] for k in keep if k in os.environ}, "HOME": home, "RUSTGIS_PLUGINS_DIR": plugins_dir}
+
+
+def run(cli: str, package: Path, cmds: list[str], env: dict, installed: bool = False) -> subprocess.CompletedProcess:
     """Runs commands in rustgis-cli on the sample, with the plugin loaded.
 
     Args:
         cli: The rustgis-cli program.
         package: The plugin's package.
         cmds: The commands to run, in order.
-        plugins_dir: The scratch plugins folder.
-        installed: The plugin is installed in `plugins_dir` (a process plugin): load the
+        env: The environment (`clean_env`), which names the scratch plugins folder.
+        installed: The plugin is installed in that folder (a process plugin): load the
             installed plugins rather than the package.
 
     Returns:
@@ -59,22 +76,20 @@ def run(cli: str, package: Path, cmds: list[str], plugins_dir: str, installed: b
     args = [cli, "run", "--sample"] if installed else [cli, "run", "--no-plugins", "--plugin", str(package), "--sample"]
     for c in cmds:
         args += ["--cmd", c]
-    env = dict(os.environ, RUSTGIS_PLUGINS_DIR=plugins_dir)
     return subprocess.run(args, capture_output=True, text=True, timeout=600, env=env)
 
 
-def plugins(cli: str, args: list[str], plugins_dir: str) -> subprocess.CompletedProcess:
+def plugins(cli: str, args: list[str], env: dict) -> subprocess.CompletedProcess:
     """Runs `rustgis-cli plugins <args>` on the scratch plugins folder.
 
     Args:
         cli: The rustgis-cli program.
         args: The subcommand and its argument (`install <file>`, `uninstall <id>`).
-        plugins_dir: The scratch plugins folder.
+        env: The environment (`clean_env`), which names the scratch plugins folder.
 
     Returns:
         The finished process.
     """
-    env = dict(os.environ, RUSTGIS_PLUGINS_DIR=plugins_dir)
     try:
         return subprocess.run([cli, "plugins", *args], capture_output=True, text=True, timeout=INSTALL_TIMEOUT, env=env)
     except subprocess.TimeoutExpired:
@@ -104,7 +119,8 @@ def main() -> int:
     k, n = (int(x) for x in args.shard.split("/"))
     registry = json.loads((DIST / "registry.json").read_text())
     failures = 0
-    with tempfile.TemporaryDirectory() as plugins_dir, tempfile.TemporaryDirectory() as downloads:
+    with tempfile.TemporaryDirectory() as plugins_dir, tempfile.TemporaryDirectory() as downloads, tempfile.TemporaryDirectory() as home:
+        env = clean_env(plugins_dir, home)
         ran = 0
         for i, e in enumerate(registry["plugins"]):
             if i % n != k - 1:
@@ -150,21 +166,21 @@ def main() -> int:
             try:
                 # A process plugin runs from its unpacked files: installed (with its Python
                 # environment) here, and removed after, even when the install half worked.
-                if process and (got := plugins(args.cli, ["install", str(package)], plugins_dir)).returncode != 0:
+                if process and (got := plugins(args.cli, ["install", str(package)], env)).returncode != 0:
                     print(f"error: RustGIS couldn't install it:\n{got.stderr}")
                     failures += 1
                     continue
-                failures += exercise(args.cli, package, e["id"], manifest, plugins_dir, process)
+                failures += exercise(args.cli, package, e["id"], manifest, env, process)
             finally:
                 if process:
-                    plugins(args.cli, ["uninstall", e["id"]], plugins_dir)
+                    plugins(args.cli, ["uninstall", e["id"]], env)
     if ran == 0:
         print("no new packages to run" if not args.all else "no packages in this shard")
     print(f"{ran} plugins run, {failures} failures")
     return 1 if failures else 0
 
 
-def exercise(cli: str, package: Path, pid: str, manifest: dict, plugins_dir: str, installed: bool) -> int:
+def exercise(cli: str, package: Path, pid: str, manifest: dict, env: dict, installed: bool) -> int:
     """Loads a plugin in rustgis-cli and runs its commands and tools on the sample.
 
     Args:
@@ -172,14 +188,14 @@ def exercise(cli: str, package: Path, pid: str, manifest: dict, plugins_dir: str
         package: The plugin's package.
         pid: The plugin's id.
         manifest: Its plugin.json.
-        plugins_dir: The scratch plugins folder.
+        env: The environment (`clean_env`), which names the scratch plugins folder.
         installed: It is installed there (a process plugin) rather than loaded from the package.
 
     Returns:
         The number of failures.
     """
     failures = 0
-    listed = run(cli, package, ["info.commands"], plugins_dir, installed)
+    listed = run(cli, package, ["info.commands"], env, installed)
     if listed.returncode != 0:
         print(f"error: RustGIS couldn't load it:\n{listed.stderr}")
         return 1
@@ -192,7 +208,7 @@ def exercise(cli: str, package: Path, pid: str, manifest: dict, plugins_dir: str
             continue
         if c.get("params", "{}") not in ("{}", "") and ":" in c.get("params", "") and "?" not in c.get("params", ""):
             continue
-        r = run(cli, package, [cid], plugins_dir, installed)
+        r = run(cli, package, [cid], env, installed)
         print(f"   command {c['id']}: {'ok' if r.returncode == 0 else 'failed (allowed): ' + r.stderr.strip()}")
     for t in manifest.get("tools", []):
         params, skip = {}, False
@@ -207,7 +223,7 @@ def exercise(cli: str, package: Path, pid: str, manifest: dict, plugins_dir: str
             print(f"   tool {t['id']}: skipped (a required parameter has no default)")
             continue
         cmd = "gp.run=" + json.dumps({"tool": f"plugin:{pid}/{t['id']}", "params": params})
-        r = run(cli, package, [cmd], plugins_dir, installed)
+        r = run(cli, package, [cmd], env, installed)
         if r.returncode == 0:
             print(f"   tool {t['id']}: ok")
         else:

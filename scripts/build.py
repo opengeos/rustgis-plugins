@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from collections import Counter
 import io
 import json
 import re
@@ -438,7 +439,7 @@ def check_process(data: bytes, m: dict, where: str) -> None:
     root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
     files = {i.filename[len(root) :]: i for i in infos if i.filename.startswith(root) and not i.is_dir()}
     # Two entries by one name: which one RustGIS unpacks last isn't what a reviewer reads.
-    for n in sorted({n for n in names if names.count(n) > 1}):
+    for n in sorted(n for n, k in Counter(names).items() if k > 1):
         problem(f"{where}: the package holds {n} more than once")
 
     run = m.get("run")
@@ -648,7 +649,8 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
 
     Only files under the package's plugin.json, by paths inside the package (no `..`, nothing
     absolute), that are UTF-8 text, at most MAX_REVIEW_FILE each and MAX_REVIEW in all. Every
-    file is listed, with its size and whether it is executable, so binaries show up too.
+    file is listed (the first MAX_ENTRIES), with its size and whether it is executable, so
+    binaries show up too. At most twice MAX_REVIEW is decompressed, whatever the headers say.
 
     Args:
         data: The package's bytes.
@@ -663,6 +665,10 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
         names = [i.filename for i in infos]
         root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
         seen: set[str] = set()
+        spent = 0  # bytes decompressed, kept or not
+        if len(infos) > MAX_ENTRIES:
+            lines.append(f"(the package holds {len(infos):,} files; only the first {MAX_ENTRIES:,} are listed)")
+            infos = infos[:MAX_ENTRIES]
         for i in infos:
             rel = i.filename[len(root) :] if i.filename.startswith(root) else None
             # Names are the package's say-so: quoted, so one can't pass for lines of its own.
@@ -677,13 +683,14 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
             if rel is None or not valid_path(rel):
                 lines.append(f"{name} ({how}): not unpacked (outside the plugin's folder, or an unsafe path)")
                 continue
-            if i.file_size > MAX_REVIEW_FILE or total + i.file_size > MAX_REVIEW:
+            if i.file_size > MAX_REVIEW_FILE or total + i.file_size > MAX_REVIEW or spent >= 2 * MAX_REVIEW:
                 lines.append(f"{name} ({how}): not unpacked (too large to review here)")
                 continue
             # The header's size is the package's say-so: read at most what it claims.
             try:
                 with z.open(i) as f:
                     body = f.read(MAX_REVIEW_FILE + 1)
+                spent += len(body)
             except (RuntimeError, NotImplementedError, zipfile.BadZipFile, zlib.error, OSError, EOFError) as e:
                 # Encrypted, an unknown compression, or corrupt.
                 lines.append(f"{name} ({how}): not unpacked (unreadable: {cell(e)})")
