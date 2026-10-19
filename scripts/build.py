@@ -227,10 +227,11 @@ def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str],
     longer = {cid: [k.encode() for k in known if k != cid and k.startswith(cid)] for cid in known}
     found = set()
     for cid in known:
-        # Bounded, so a module repeating a longer id can't make the scan crawl.
+        # Bounded, so a module repeating a longer id can't make the scan crawl; one that hits the
+        # bound counts as naming the id, so the repeats can't hide it either.
         at, tries = seg.find(cid.encode()), 0
-        while at != -1 and tries < 1000:
-            if not any(seg.startswith(k, at) for k in longer[cid]):
+        while at != -1:
+            if tries == 1000 or not any(seg.startswith(k, at) for k in longer[cid]):
                 found.add(cid)
                 break
             at, tries = seg.find(cid.encode(), at + 1), tries + 1
@@ -244,7 +245,8 @@ def known_commands() -> list[str]:
     except OSError:
         return []
     # A one-word id (`identify`) matches ordinary text too often to say anything.
-    return [ln.strip() for ln in lines if "." in ln and not ln.startswith("#")]
+    stripped = (ln.strip() for ln in lines)
+    return [ln for ln in stripped if "." in ln and not ln.startswith("#")]
 
 
 # --------------------------------------------------------------------------------------------
