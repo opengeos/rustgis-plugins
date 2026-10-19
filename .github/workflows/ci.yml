@@ -81,7 +81,7 @@ jobs:
         id: cli
         with:
           path: ~/rustgis-cli
-          key: rustgis-cli-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
+          key: rustgis-cli-v2-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
       - name: Build rustgis-cli
         if: steps.cli.outputs.cache-hit != 'true'
         run: |
@@ -119,7 +119,7 @@ jobs:
         id: cli
         with:
           path: ~/rustgis-cli
-          key: rustgis-cli-${{ runner.os }}-${{ needs.registry.outputs.rustgis }}
+          key: rustgis-cli-v2-${{ runner.os }}-${{ needs.registry.outputs.rustgis }}
       - name: Build rustgis-cli
         if: steps.cli.outputs.cache-hit != 'true'
         run: |

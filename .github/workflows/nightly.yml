@@ -30,9 +30,12 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       # Caches are saved before any plugin runs, never after: a process plugin isn't sandboxed,
-      # and a cache it changed would be restored by later runs, pull requests' included.
+      # and a cache it changed would be restored by later runs, pull requests' included. The keys
+      # (v1-rust here, rustgis-cli-v2 below and in ci.yml) were rotated when this started, so no
+      # entry saved after plugins ran is restored.
       - uses: Swatinem/rust-cache@v2
         with:
+          prefix-key: v1-rust
           save-if: false
       - uses: actions/setup-python@v7
         with:
@@ -47,7 +50,7 @@ jobs:
         id: cli
         with:
           path: ~/rustgis-cli
-          key: rustgis-cli-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
+          key: rustgis-cli-v2-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
       - name: Build rustgis-cli
         if: steps.cli.outputs.cache-hit != 'true'
         run: |
@@ -57,6 +60,6 @@ jobs:
         if: steps.cli.outputs.cache-hit != 'true'
         with:
           path: ~/rustgis-cli
-          key: rustgis-cli-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
+          key: rustgis-cli-v2-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
       - name: Run every published plugin in RustGIS
         run: python scripts/smoke.py --all --shard ${{ matrix.shard }}/4 --cli ~/rustgis-cli/rustgis-cli

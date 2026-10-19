@@ -84,7 +84,7 @@ MAX_UNPACKED = 1024 * 1024 * 1024
 MAX_RUN_ARGS = 64
 MAX_TEXT = 2000
 RUN_PLATFORMS = ("windows", "macos", "linux", "default")
-PYTHON_VERSION_RE = re.compile(r"3\.\d{1,3}(\.\d{1,3})?")
+PYTHON_VERSION_RE = re.compile(r"3\.\d{1,3}(\.\d{1,3})?", re.ASCII)
 # The programs RustGIS swaps for the plugin's own environment's interpreter.
 PYTHONS = {"python", "python3", "python.exe"}
 # RustGIS's own tabs: a plugin's tab can't take their names.
