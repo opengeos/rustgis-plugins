@@ -289,7 +289,7 @@ def check_panel(m: dict, where: str) -> None:
     seen: set[str] = set()
     for item in items:
         kind = item.get("kind") if isinstance(item, dict) else None
-        if kind not in PANEL_KINDS:
+        if not isinstance(kind, str) or kind not in PANEL_KINDS:
             problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
             continue
         command = item.get("command")
