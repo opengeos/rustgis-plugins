@@ -3,6 +3,7 @@
 
     python scripts/smoke.py [--cli path/to/rustgis-cli]         # the packages this build made
     python scripts/smoke.py --all [--cli path/to/rustgis-cli]   # every listed package (nightly)
+    python scripts/smoke.py --runtime wasm|process ...           # only WebAssembly or process plugins
 
 For each plugin: RustGIS must load it and list its commands; each tool runs with its defaults
 (layer parameters get a sample layer of the right kind) and must succeed; each command that
@@ -98,6 +99,7 @@ def main() -> int:
     ap.add_argument("--cli", default=os.environ.get("RUSTGIS_CLI") or shutil.which("rustgis-cli") or "rustgis-cli")
     ap.add_argument("--all", action="store_true", help="every listed package, downloading published ones")
     ap.add_argument("--shard", default="1/1", help="with --all, run part k of n (k/n), for parallel jobs")
+    ap.add_argument("--runtime", choices=("all", "wasm", "process"), default="all", help="run only WebAssembly or process plugins")
     args = ap.parse_args()
     k, n = (int(x) for x in args.shard.split("/"))
     registry = json.loads((DIST / "registry.json").read_text())
@@ -132,16 +134,19 @@ def main() -> int:
                     failures += 1
                     continue
                 package.write_bytes(data)
-            ran += 1
-            print(f"== {e['id']} {e['version']}")
             with zipfile.ZipFile(package) as z:
                 root = "" if "plugin.json" in z.namelist() else next(n[: -len("plugin.json")] for n in z.namelist() if n.endswith("/plugin.json"))
                 manifest = json.loads(z.read(root + "plugin.json"))
             process = manifest.get("runtime") == "process"
+            if args.runtime != "all" and process != (args.runtime == "process"):
+                print(f"== {e['id']} {e['version']}: a {'process' if process else 'WebAssembly'} plugin, not run here")
+                continue
+            print(f"== {e['id']} {e['version']}")
             if process and not runs_on_linux(manifest):
                 # RustGIS won't load it here at all; build.py checked its manifest and files.
                 print("   skipped: a process plugin with no program for Linux, which RustGIS can't run here (run it on its platforms by hand)")
                 continue
+            ran += 1
             try:
                 # A process plugin runs from its unpacked files: installed (with its Python
                 # environment) here, and removed after, even when the install half worked.

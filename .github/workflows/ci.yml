@@ -5,8 +5,7 @@ on:
   push:
     branches: [main]
 
-# The smoke test runs process plugins, which aren't sandboxed, from unmerged pull requests:
-# they get a read-only token and no secrets.
+# Nothing here needs more than reading the repository (and no step uses a secret).
 permissions:
   contents: read
 
@@ -38,6 +37,8 @@ jobs:
   registry:
     name: Build and check the registry
     runs-on: ubuntu-latest
+    outputs:
+      rustgis: ${{ steps.rustgis.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -86,9 +87,43 @@ jobs:
         run: |
           cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ steps.rustgis.outputs.sha }}" rustgis-cli --root ~/rustgis-cli-root
           mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
+      # WebAssembly plugins only: they run sandboxed. Process plugins run in the next job.
       - name: Run the changed plugins in RustGIS
-        run: python scripts/smoke.py --cli ~/rustgis-cli/rustgis-cli
+        run: python scripts/smoke.py --runtime wasm --cli ~/rustgis-cli/rustgis-cli
       - uses: actions/upload-artifact@v4
         with:
           name: registry
           path: dist/
+
+  # Process plugins aren't sandboxed, and a pull request's run before anyone reviews them. So
+  # they run apart from the jobs that save caches and upload artifacts: this job gets the
+  # packages from the registry job, keeps no token in the checkout, only restores the
+  # rustgis-cli cache, and saves and uploads nothing.
+  process-plugins:
+    name: Run the changed process plugins
+    needs: registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: registry
+          path: dist
+      - uses: actions/cache/restore@v4
+        id: cli
+        with:
+          path: ~/rustgis-cli
+          key: rustgis-cli-${{ runner.os }}-${{ needs.registry.outputs.rustgis }}
+      - name: Build rustgis-cli
+        if: steps.cli.outputs.cache-hit != 'true'
+        run: |
+          cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ needs.registry.outputs.rustgis }}" rustgis-cli --root ~/rustgis-cli-root
+          mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
+      - name: Run the changed process plugins in RustGIS
+        run: python scripts/smoke.py --runtime process --cli ~/rustgis-cli/rustgis-cli

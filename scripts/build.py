@@ -46,6 +46,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+import zlib
 from pathlib import Path
 
 if sys.version_info < (3, 11):
@@ -389,13 +390,16 @@ def python_script(args: list[str]) -> str | None:
 
     Returns:
         The first argument that isn't an option, or None when there is none or the interpreter
-        runs a module or a command instead (`-m`, `-c`).
+        runs a module or a command instead (`-m`, `-c`, also in a cluster of short options).
     """
     skip = False
     for a in args:
         if skip:
             skip = False
-        elif a in ("-m", "-c") or a.startswith(("-m", "-c")) and not a.startswith("--"):
+        elif a.startswith("-") and not a.startswith("--") and ("m" in a or "c" in a):
+            # A module or a command (`-m pkg`, `-um pkg`, `-c code`), or a short option cluster
+            # that may hold one: nothing to check. (Long options, `--check-hash-based-pycs`, are
+            # skipped below.)
             return None
         elif a in ("-W", "-X"):
             skip = True  # an option with a value
@@ -433,6 +437,9 @@ def check_process(data: bytes, m: dict, where: str) -> None:
     names = [i.filename for i in infos]
     root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
     files = {i.filename[len(root) :]: i for i in infos if i.filename.startswith(root) and not i.is_dir()}
+    # Two entries by one name: which one RustGIS unpacks last isn't what a reviewer reads.
+    for n in sorted({n for n in names if names.count(n) > 1}):
+        problem(f"{where}: the package holds {n} more than once")
 
     run = m.get("run")
     if isinstance(run, list):
@@ -655,11 +662,18 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
         infos = [i for i in z.infolist() if not i.is_dir()]
         names = [i.filename for i in infos]
         root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), "")
+        seen: set[str] = set()
         for i in infos:
             rel = i.filename[len(root) :] if i.filename.startswith(root) else None
             # Names are the package's say-so: quoted, so one can't pass for lines of its own.
             name = json.dumps(rel if rel is not None else i.filename, ensure_ascii=False)
-            how = ("executable, " if executable(i) else "") + f"{i.file_size:,} B"
+            link = i.create_system == 3 and (i.external_attr >> 16) & 0o170000 == 0o120000
+            how = ("a symbolic link in the zip (RustGIS unpacks it as a file holding its target), " if link else "")
+            how += ("executable, " if executable(i) else "") + f"{i.file_size:,} B"
+            if i.filename in seen:
+                lines.append(f"{name} ({how}): not unpacked (the package holds this name more than once)")
+                continue
+            seen.add(i.filename)
             if rel is None or not valid_path(rel):
                 lines.append(f"{name} ({how}): not unpacked (outside the plugin's folder, or an unsafe path)")
                 continue
@@ -667,8 +681,13 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
                 lines.append(f"{name} ({how}): not unpacked (too large to review here)")
                 continue
             # The header's size is the package's say-so: read at most what it claims.
-            with z.open(i) as f:
-                body = f.read(MAX_REVIEW_FILE + 1)
+            try:
+                with z.open(i) as f:
+                    body = f.read(MAX_REVIEW_FILE + 1)
+            except (RuntimeError, NotImplementedError, zipfile.BadZipFile, zlib.error, OSError, EOFError) as e:
+                # Encrypted, an unknown compression, or corrupt.
+                lines.append(f"{name} ({how}): not unpacked (unreadable: {cell(e)})")
+                continue
             try:
                 if len(body) > MAX_REVIEW_FILE or "\0" in (text := body.decode("utf-8")):
                     raise ValueError
@@ -731,7 +750,8 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
                 (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
         # The manifest's text goes into a table: one line, no cell breaks.
         version = cell(manifest.get("version"))
-        perms = cell(", ".join(map(str, manifest.get("permissions", []))) or "none")
+        listed = manifest.get("permissions", [])
+        perms = cell(", ".join(map(str, listed)) or "none") if isinstance(listed, list) else f"not a list: {cell(json.dumps(listed))}"
         if manifest.get("runtime") == "process":
             # Not sandboxed, and its code is readable: unpack it for review.
             listing = unpack_for_review(data, dest / "files")
@@ -805,11 +825,14 @@ def main() -> int:
                 problem(f"{where}: {reg['path']}/plugin.json is missing")
                 continue
             try:
-                version = str(json.loads(manifest_path.read_text()).get("version", ""))
-            except (OSError, json.JSONDecodeError) as e:
+                local = json.loads(manifest_path.read_text())
+                if not isinstance(local, dict):
+                    raise ValueError("not a JSON object")
+                version = str(local.get("version", ""))
+            except (OSError, ValueError) as e:
                 problem(f"{where}: {reg['path']}/plugin.json: {e}")
                 continue
-            if json.loads(manifest_path.read_text()).get("runtime") == "process":
+            if local.get("runtime") == "process":
                 problem(f"{where}: plugins in this repository are WebAssembly; publish a process plugin as a package elsewhere and list it by 'source'")
                 continue
             tree = tree_hash(folder)
