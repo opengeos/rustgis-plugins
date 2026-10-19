@@ -29,7 +29,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+      # Caches are saved before any plugin runs, never after: a process plugin isn't sandboxed,
+      # and a cache it changed would be restored by later runs, pull requests' included.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
@@ -39,7 +43,7 @@ jobs:
       - name: RustGIS commit to test against
         id: rustgis
         run: echo "sha=$(git ls-remote https://github.com/opengeos/RustGIS main | cut -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         id: cli
         with:
           path: ~/rustgis-cli
@@ -49,5 +53,10 @@ jobs:
         run: |
           cargo install --locked --git https://github.com/opengeos/RustGIS --rev "${{ steps.rustgis.outputs.sha }}" rustgis-cli --root ~/rustgis-cli-root
           mkdir -p ~/rustgis-cli && cp ~/rustgis-cli-root/bin/rustgis-cli ~/rustgis-cli/
+      - uses: actions/cache/save@v4
+        if: steps.cli.outputs.cache-hit != 'true'
+        with:
+          path: ~/rustgis-cli
+          key: rustgis-cli-${{ runner.os }}-${{ steps.rustgis.outputs.sha }}
       - name: Run every published plugin in RustGIS
         run: python scripts/smoke.py --all --shard ${{ matrix.shard }}/4 --cli ~/rustgis-cli/rustgis-cli

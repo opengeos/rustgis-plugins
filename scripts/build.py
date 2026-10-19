@@ -84,7 +84,7 @@ MAX_UNPACKED = 1024 * 1024 * 1024
 MAX_RUN_ARGS = 64
 MAX_TEXT = 2000
 RUN_PLATFORMS = ("windows", "macos", "linux", "default")
-PYTHON_VERSION_RE = re.compile(r"^3\.\d{1,3}(\.\d{1,3})?$")
+PYTHON_VERSION_RE = re.compile(r"3\.\d{1,3}(\.\d{1,3})?")
 # The programs RustGIS swaps for the plugin's own environment's interpreter.
 PYTHONS = {"python", "python3", "python.exe"}
 # RustGIS's own tabs: a plugin's tab can't take their names.
@@ -662,7 +662,7 @@ def check_process(data: bytes, m: dict, where: str) -> None:
         problem(f"{where}: python must be an object: {{\"version\": \"3.12\", \"requirements\": \"requirements.txt\"}}")
         return
     version = py.get("version", "3.12")
-    if not isinstance(version, str) or not PYTHON_VERSION_RE.match(version):
+    if not isinstance(version, str) or not PYTHON_VERSION_RE.fullmatch(version):
         problem(f"{where}: python.version must look like 3.12 or 3.12.4")
     req = py.get("requirements", "")
     if not isinstance(req, str):
