@@ -577,9 +577,9 @@ def python_script(args: list[str]) -> str | None:
     for a in args:
         if skip:
             skip = False
-        elif a.startswith(("-W", "-X")):
+        elif a.startswith(("-W", "-X")) or a == "--check-hash-based-pycs":
             # An option with a value, attached (`-Wignore`, `-Xutf8`) or next (`-W ignore`).
-            skip = a in ("-W", "-X")
+            skip = a in ("-W", "-X", "--check-hash-based-pycs")
         elif a.startswith("-") and not a.startswith("--") and ("m" in a or "c" in a):
             # A module or a command (`-m pkg`, `-um pkg`, `-c code`), or a short option cluster
             # that may hold one: nothing to check. (Long options, `--check-hash-based-pycs`, are
