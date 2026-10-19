@@ -561,6 +561,8 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             commands, urls, n_urls = module_strings(wasm, known)
             named = ", ".join(commands) or "none"
             listed = ", ".join(f"`{c}`" for c in commands) or "none"
+            if not known:
+                named = listed = f"unknown: the command list {COMMANDS.name} is missing or empty"
         except (ValueError, IndexError) as e:
             urls, n_urls = [], 0
             named = f"(the module's strings could not be read: {e})"
@@ -572,7 +574,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         (dest / "module.wasm").write_bytes(wasm)
         (dest / "module.txt").write_text(
             "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
-            + "commands named: " + named + "\n"
+            + "commands named in strings (not those built at run time): " + named + "\n"
             + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
         )
         rows.append(
@@ -580,7 +582,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         )
     report = ["# Packages this PR points at", ""]
     if rows:
-        report += ["| id | version | package | module | permissions | module imports | commands named |", "|---|---|---|---|---|---|---|", *rows, ""]
+        report += ["| id | version | package | module | permissions | module imports | commands named in strings |", "|---|---|---|---|---|---|---|", *rows, ""]
     report += notes or ["All changed entries with a source were inspected."]
     (out / "report.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))

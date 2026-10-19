@@ -218,7 +218,8 @@ jobs:
               continue
             fi
             # Capped at 8 MB of text; a cut-off disassembly says so on its last line.
-            if ! timeout 60 wasm2wat "$wasm" | head -c 8388608 > "$RUNNER_TEMP/wat/$id.wat"; then
+            # No token for the parser; --enable-all for the proposals Rust modules use.
+            if ! env -u GH_TOKEN timeout 60 wasm2wat --enable-all "$wasm" | head -c 8388608 > "$RUNNER_TEMP/wat/$id.wat"; then
               echo ";; (disassembly failed or was cut off)" >> "$RUNNER_TEMP/wat/$id.wat"
             fi
           done
@@ -233,8 +234,9 @@ jobs:
 
   claude-review:
     needs: disassemble
-    # The gate is on the disassemble job; a failed disassembly still gets a review.
-    if: ${{ !cancelled() && needs.disassemble.result != 'skipped' }}
+    # The gate is on the disassemble job, whose disassembly steps can't fail it: the job
+    # fails only before it has resolved the PR, and then there is nothing to review.
+    if: ${{ needs.disassemble.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -469,7 +471,7 @@ jobs:
 
             End the summary comment with a "### Change size" table built from `.pr-stats/stats.json` (after the "### Plugin packages" section when there is one). It covers the whole PR compared with the base branch, not the latest push, so put its `compared` text in a line under the heading. The table has one row each for files changed (with the added, modified, removed and renamed counts), size before, size after, and the total size change (signed, e.g. "+12.3 KB"). Under it, add a second table from `largest_changes` with one row per file: path, size before, size after and size change. Show sizes in B, KB or MB as fits. Both tables report file sizes, not line counts: never substitute the diff's added or removed lines for a size. If the stats file says they are unavailable, or `trees_truncated` is true, say so under the table instead of estimating.
 
-            When `.plugin-review/report.md` exists, the summary comment must also contain a "### Plugin packages" section: a table with one row per inspected plugin giving its id, version, package size, module size, permissions, module imports and commands named (copy them exactly from the report), followed by your assessment of each plugin, or the reason it could not be inspected. Findings about a package's contents cannot be inline comments (those files are not in the diff), so list them in this section.
+            When `.plugin-review/report.md` exists, the summary comment must also contain a "### Plugin packages" section: a table with one row per inspected plugin giving its id, version, package size, module size, permissions, module imports and commands named in strings (copy them exactly from the report), followed by your assessment of each plugin, or the reason it could not be inspected. Findings about a package's contents cannot be inline comments (those files are not in the diff), so list them in this section.
 
             Do not approve, merge, or modify any code. Only review and comment. Do not use web fetch; use the gh CLI for all GitHub interactions.
 
