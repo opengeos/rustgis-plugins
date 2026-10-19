@@ -254,7 +254,7 @@ says whether this call set it), and answer the panel's new state with a `Panel`:
 use rustgis_plugin::Panel;
 
 let panel = Panel::new().value("year", 2020).text("summary", "3 layers").enabled("reset", true);
-Ok(json!({"year": 2020, "panel": panel}))
+Ok(panel.answer(json!({"year": 2020}))) // {"year": 2020, "panel": {...}}
 ```
 
 See [A panel](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#a-panel) in

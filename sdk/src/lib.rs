@@ -351,7 +351,7 @@ impl From<ToolOutput> for Value {
 ///
 /// ```ignore
 /// let panel = Panel::new().value("year", 2020).text("summary", "3 layers").enabled("older", false);
-/// Ok(json!({"year": 2020, "panel": panel}))
+/// Ok(panel.answer(json!({"year": 2020})))
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct Panel {
@@ -394,6 +394,18 @@ impl Panel {
     pub fn slider(self, id: &str, min: i64, max: i64, labels: &[String]) -> Panel {
         let p = self.item(id, "min", json!(min)).item(id, "max", json!(max));
         if labels.is_empty() { p } else { p.item(id, "labels", json!(labels)) }
+    }
+
+    /// `answer` (the command's own answer, an object) with this state as its `panel`. Or put
+    /// `Value::from(panel)` in the answer yourself.
+    pub fn answer(self, answer: Value) -> Value {
+        let mut answer = match answer {
+            Value::Object(m) => m,
+            Value::Null => Map::new(),
+            other => Map::from_iter([("answer".to_string(), other)]),
+        };
+        answer.insert("panel".into(), self.into());
+        Value::Object(answer)
     }
 
     fn item(mut self, id: &str, field: &str, value: Value) -> Panel {
@@ -669,6 +681,9 @@ mod tests {
                 "release": {"min": 0, "max": 3, "labels": ["a", "b", "c", "d"]}
             }})
         );
+        let a = Panel::new().text("t", "x").answer(json!({"year": 1}));
+        assert_eq!(a, json!({"year": 1, "panel": {"values": {}, "items": {"t": {"text": "x"}}}}));
+        assert_eq!(Panel::new().answer(json!(7))["answer"], 7);
     }
 
     #[test]
