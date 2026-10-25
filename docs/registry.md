@@ -31,6 +31,7 @@ from `packages.rustgis.app/my-plugin/my-plugin-<version>.rgplugin` with that has
 edits to your release don't change what people install. A new version needs a new `version` and
 a new `source`.
 
+<!-- Preserve links to the original Python process-plugin section. -->
 <a id="a-process-plugin-python"></a>
 
 ## A process plugin (Rust or Python)

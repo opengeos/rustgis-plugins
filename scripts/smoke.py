@@ -11,8 +11,9 @@ needs no parameters runs too (a failure there is reported but doesn't fail the c
 command may need a selection or a layer the sample doesn't have).
 
 A process plugin ("runtime": "process") runs from its unpacked files, so it is installed into a
-scratch plugins folder first (`rustgis-cli plugins install`, which also makes its Python
-environment with uv: this downloads Python and its packages), run as installed, and uninstalled.
+scratch plugins folder first (`rustgis-cli plugins install`), run as installed, and uninstalled.
+When the manifest declares `python`, installation also prepares its environment with uv,
+downloading Python and its packages.
 One with no program for Linux is skipped (RustGIS can't load it here; build.py checks its files).
 """
 
