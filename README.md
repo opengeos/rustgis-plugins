@@ -3,8 +3,8 @@
 The plugin registry of [RustGIS](https://github.com/opengeos/RustGIS), published at
 **[plugins.rustgis.app](https://plugins.rustgis.app)**, and the plugin SDK.
 
-A RustGIS plugin is a WebAssembly module (or, for a process plugin, a program such as a Python
-script) with a `plugin.json` manifest, packaged as a `.rgplugin` file. It adds commands, ribbon
+A RustGIS plugin is a WebAssembly module (or, for a process plugin, a native Rust executable or
+Python script) with a `plugin.json` manifest, packaged as a `.rgplugin` file. It adds commands, ribbon
 tabs, panels and geoprocessing tools. See
 [RustGIS's plugin documentation](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md)
 for the design, the permissions and the ABI.
@@ -18,14 +18,15 @@ repository and releases its `.rgplugin` there; a pull request here adds or updat
 |---|---|
 | [`registry/`](registry) | one entry per listed plugin |
 | [`blocklist.json`](blocklist.json) | withdrawn plugins |
-| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for writing plugins |
+| [`sdk/`](sdk) | `rustgis-plugin`, the Rust SDK for WebAssembly plugins |
 | [`scripts/build.py`](scripts/build.py) | checks the registry and its packages, and writes `dist/` |
 | [`scripts/upload.py`](scripts/upload.py) | uploads new packages to `packages.rustgis.app` |
 | [`scripts/smoke.py`](scripts/smoke.py) | runs new packages (or `--all`) in `rustgis-cli` |
 | [`scripts/preview.py`](scripts/preview.py) | makes a pull request's plugin preview from `dist/` |
 | [`docs/`](docs) | the site at plugins.rustgis.app |
-| [rustgis-plugin-template](https://github.com/opengeos/rustgis-plugin-template) | start a plugin in Rust |
-| [rustgis-python-plugin-template](https://github.com/opengeos/rustgis-python-plugin-template) | start a plugin in Python |
+| [rustgis-plugin-template](https://github.com/opengeos/rustgis-plugin-template) | start a sandboxed Rust WebAssembly plugin |
+| [rustgis-rust-process-plugin-template](https://github.com/opengeos/rustgis-rust-process-plugin-template) | start a native Rust process plugin |
+| [rustgis-python-plugin-template](https://github.com/opengeos/rustgis-python-plugin-template) | start a Python process plugin |
 | [rustgis-official-plugins](https://github.com/opengeos/rustgis-official-plugins) | the RustGIS project's own plugins ([official-plugins.rustgis.app](https://official-plugins.rustgis.app)) |
 
 ## Build
@@ -45,8 +46,9 @@ set **Plugins › Plugin Manager › Settings › Plugin registry** to
 ## Add a plugin
 
 1. Write it in its own repository, from the
-   [Rust](https://github.com/opengeos/rustgis-plugin-template) or
-   [Python](https://github.com/opengeos/rustgis-python-plugin-template) template. See
+   [Rust WebAssembly](https://github.com/opengeos/rustgis-plugin-template),
+   [Rust process](https://github.com/opengeos/rustgis-rust-process-plugin-template) or
+   [Python process](https://github.com/opengeos/rustgis-python-plugin-template) template. See
    [Write a plugin](https://plugins.rustgis.app/develop/).
 2. Release it: the templates' Release workflow attaches the `.rgplugin` to a GitHub release, with
    its registry entry.

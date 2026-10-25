@@ -1,6 +1,6 @@
 [project]
 site_name = "RustGIS Plugins"
-site_description = "Plugins for RustGIS: sandboxed WebAssembly modules that add commands and geoprocessing tools"
+site_description = "Plugins for RustGIS: WebAssembly modules and native programs that add commands and geoprocessing tools"
 site_author = "opengeos"
 site_url = "https://plugins.rustgis.app"
 repo_url = "https://github.com/opengeos/rustgis-plugins"

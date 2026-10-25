@@ -9,8 +9,9 @@ here aren't accepted.
 
 ## Your registry entry
 
-Start from the [Rust template](https://github.com/opengeos/rustgis-plugin-template) or the
-[Python template](https://github.com/opengeos/rustgis-python-plugin-template): their Release
+Start from the [Rust WebAssembly template](https://github.com/opengeos/rustgis-plugin-template),
+[Rust process template](https://github.com/opengeos/rustgis-rust-process-plugin-template) or
+[Python process template](https://github.com/opengeos/rustgis-python-plugin-template): their Release
 workflow attaches the `.rgplugin` to a GitHub release and writes this entry for you. Or attach a
 `.rgplugin` package to a release in your own repository yourself, and add:
 
@@ -30,13 +31,19 @@ from `packages.rustgis.app/my-plugin/my-plugin-<version>.rgplugin` with that has
 edits to your release don't change what people install. A new version needs a new `version` and
 a new `source`.
 
-## A process plugin (Python)
+<a id="a-process-plugin-python"></a>
+
+## A process plugin (Rust or Python)
 
 A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) (`"runtime": "process"`) is a program instead of a WebAssembly
-module, usually a Python script, that speaks the plugin protocol over its standard input and
-output. Start from the
-[Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template), which
-packages one and attaches it to a release. List it like any other plugin, with a `source`.
+module, such as a native Rust executable or a Python script, that speaks the plugin protocol
+over its standard input and output. The
+[Rust process template](https://github.com/opengeos/rustgis-rust-process-plugin-template) provides
+a command, a tool and JSON-line transport, and releases one package containing Linux, Windows
+and universal macOS executables. Users run it without Rust or Python installed. The
+[Python process template](https://github.com/opengeos/rustgis-python-plugin-template) packages a
+Python program and declares its managed environment. Both attach a `.rgplugin` and its registry
+entry to a release. List either like any other plugin, with a `source`.
 
 Process plugins are accepted, with two differences:
 
@@ -56,15 +63,15 @@ CI checks the package's files in place of a module:
   `.bat` or `.cmd`); the script a `python` command runs (`["python", "main.py"]`) is in the
   package too. A bare name (`python3`, `node`) is looked up on PATH, not in the package. A
   full path to a program isn't accepted. The execute bit is the file's Unix mode
-  in the zip: pack the package on Linux or macOS, or with a tool that keeps the mode, since a
-  zip made on Windows has none.
+  in the zip: use a packaging tool that preserves it, such as the templates' packaging scripts,
+  including when building on Windows.
 - `python`, when given, has a `version` like `3.12` or `3.12.4`, its `requirements` file is in
   the package, and `run` starts `python`, which RustGIS swaps for the environment's interpreter.
 - There is no `entry`, the package holds at most 4,096 files, and they unpack to at most 1 GB.
 
-The smoke test installs the package with `rustgis-cli plugins install` (which makes its Python
-environment with uv) and runs it on the World Atlas sample on Linux. A plugin with no program
-for Linux is skipped there, so say how you tested it in the pull request. Since CI runs a pull
+The smoke test installs the package with `rustgis-cli plugins install` (which prepares a Python
+environment with uv when the manifest declares one) and runs it on the World Atlas sample on
+Linux. A plugin with no program for Linux is skipped there, so say how you tested it in the pull request. Since CI runs a pull
 request's process plugin before it is reviewed, it does so in a job of its own, with no
 credentials, that saves and uploads nothing. The plugin still has the runner's network there.
 
@@ -74,7 +81,7 @@ credentials, that saves and uploads nothing. The plugin still has the runner's n
 
 - the manifest: id, version, permissions, commands, tools and parameter kinds;
 - that the module exports what RustGIS needs and imports nothing else (no WASI, no
-  JavaScript glue), or, for a [process plugin](#a-process-plugin-python), its `run`, `python`
+  JavaScript glue), or, for a [process plugin](#a-process-plugin-rust-or-python), its `run`, `python`
   and files;
 - that the package's id matches its registry file.
 

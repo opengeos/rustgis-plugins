@@ -1,21 +1,20 @@
 # Write a plugin
 
 The quickest start is the
-[plugin template](https://github.com/opengeos/rustgis-plugin-template): use it on GitHub
+[Rust WebAssembly template](https://github.com/opengeos/rustgis-plugin-template): use it on GitHub
 (**Use this template**), pick a starter (commands on the Plugins tab, a tab of its own, a panel,
 or geoprocessing tools), and its workflows build, test and release your `.rgplugin`. The
 [official plugins](https://official-plugins.rustgis.app) are examples to read, starting with
 [Hello RustGIS](https://github.com/opengeos/rustgis-official-plugins/tree/main/plugins/hello).
 
-Plugins are written in Rust with the
+WebAssembly plugins are written in Rust with the
 [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk) SDK, and built for
 `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 
-!!! tip "Writing it in Python?"
-    A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) is a program, such as a Python script with numpy or GDAL,
-    instead of a module. It isn't sandboxed and runs on the desktop and the command line only.
-    Start from the [Python plugin template](https://github.com/opengeos/rustgis-python-plugin-template), and see
-    [A process plugin](registry.md#a-process-plugin-python) for how it is listed.
+!!! tip "Need a native process plugin?"
+    A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) is a program instead of a WebAssembly module. It isn't sandboxed and runs on the desktop and the command line only.
+    Start from the [Rust process template](https://github.com/opengeos/rustgis-rust-process-plugin-template) for a native executable with JSON-line transport, command and tool examples, packaging, and Linux, Windows and universal macOS release builds. Users need no Rust or Python installation to run its packaged executable.
+    For a Python script with libraries such as numpy or GDAL, use the [Python process template](https://github.com/opengeos/rustgis-python-plugin-template). See [A process plugin](registry.md#a-process-plugin-rust-or-python) for how either runtime is listed.
 
 ```toml
 [lib]
