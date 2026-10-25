@@ -71,9 +71,10 @@ CI checks the package's files in place of a module:
 
 The smoke test installs the package with `rustgis-cli plugins install` (which prepares a Python
 environment with uv when the manifest declares one) and runs it on the World Atlas sample on
-Linux. A plugin with no program for Linux is skipped there, so say how you tested it in the pull request. Since CI runs a pull
-request's process plugin before it is reviewed, it does so in a job of its own, with no
-credentials, that saves and uploads nothing. The plugin still has the runner's network there.
+Linux. A plugin with no program for Linux is skipped there, so say how you tested it in the pull
+request. Since CI runs a pull request's process plugin before it is reviewed, it does so in a
+job of its own, with no credentials, that saves and uploads nothing. The plugin still has the
+runner's network there.
 
 ## What CI checks
 

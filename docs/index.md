@@ -33,9 +33,9 @@ layers, data files, web services) only with the `network` permission. You see th
 Plugins have no other access to your computer or the network. Each call has a time and memory budget, so a misbehaving
 plugin is stopped, and it can't crash RustGIS. The exception is a process plugin (a native Rust
 executable or Python script, for example), marked **Not sandboxed**: it runs as a program on
-your computer and can do anything you can, so it is reviewed more strictly, and it runs only on the desktop and the
-command line. Every plugin here is reviewed before it is
-listed. Withdrawn plugins are listed in [`blocklist.json`](https://plugins.rustgis.app/blocklist.json),
+your computer and can do anything you can, so it is reviewed more strictly, and it runs only on
+the desktop and the command line. Every plugin here is reviewed before it is listed.
+Withdrawn plugins are listed in [`blocklist.json`](https://plugins.rustgis.app/blocklist.json),
 and RustGIS turns them off.
 
 ## For RustGIS

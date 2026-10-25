@@ -11,10 +11,17 @@ WebAssembly plugins are written in Rust with the
 [`rustgis-plugin`](https://github.com/opengeos/rustgis-plugins/tree/main/sdk) SDK, and built for
 `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 
-!!! tip "Need a native process plugin?"
-    A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins) is a program instead of a WebAssembly module. It isn't sandboxed and runs on the desktop and the command line only.
-    Start from the [Rust process template](https://github.com/opengeos/rustgis-rust-process-plugin-template) for a native executable with JSON-line transport, command and tool examples, packaging, and Linux, Windows and universal macOS release builds. Users need no Rust or Python installation to run its packaged executable.
-    For a Python script with libraries such as numpy or GDAL, use the [Python process template](https://github.com/opengeos/rustgis-python-plugin-template). See [A process plugin](registry.md#a-process-plugin-rust-or-python) for how either runtime is listed.
+!!! tip "Writing a process plugin?"
+    A [process plugin](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#process-plugins)
+    is a program instead of a WebAssembly module. It isn't sandboxed and runs on the desktop
+    and the command line only.
+    Start from the [Rust process template](https://github.com/opengeos/rustgis-rust-process-plugin-template)
+    for a native executable with JSON-line transport, command and tool examples, packaging,
+    and Linux, Windows and universal macOS release builds. Users need no Rust or Python
+    installation to run its packaged executable.
+    For a Python script with libraries such as numpy or GDAL, use the
+    [Python process template](https://github.com/opengeos/rustgis-python-plugin-template). See
+    [A process plugin](registry.md#a-process-plugin-rust-or-python) for how either runtime is listed.
 
 ```toml
 [lib]
