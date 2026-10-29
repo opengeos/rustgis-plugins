@@ -1,0 +1,11 @@
+{
+  "id": "advanced-editing",
+  "source": {
+    "url": "https://github.com/PawelKra/advanced-editing/releases/download/v0.1.1/advanced-editing-0.1.1.rgplugin",
+    "sha256": "159c6185bbb4fcedfcf8cb522df9e897e3b781df805510585d3f4d950c522c18"
+  },
+  "categories": [
+    "Editing",
+    "Vector"
+  ]
+}
