@@ -242,10 +242,12 @@ an example.
 
 ## A panel
 
-A plugin can have a panel: a pane on the right of the map with texts, checkboxes, sliders and
-buttons bound to its commands. Its button comes first in the plugin's group on the **Plugins**
-tab; on a tab of its own, put `panel` among a group's items. Panels need a RustGIS newer than
-0.3.0, which ignores them (keep the commands usable from the ribbon too).
+A plugin can have a panel: a pane on the right of the map with texts, checkboxes, sliders,
+buttons and trees bound to its commands. Its button comes first in the plugin's group on the
+**Plugins** tab; on a tab of its own, put `panel` among a group's items. Panels need a RustGIS
+newer than 0.3.0, which ignores them (keep the commands usable from the ribbon too). Trees need
+one newer than 0.4.0, which refuses a manifest with a tree: set `minRustgisVersion` to the first
+release with them.
 
 ```json
 "panel": {
@@ -257,20 +259,35 @@ tab; on a tab of its own, put `panel` among a group's items. Panels need a RustG
     { "kind": "text", "id": "summary", "label": "Summary" },
     { "kind": "checkbox", "id": "visible-only", "label": "Visible layers only", "command": "panel-state" },
     { "kind": "slider", "id": "year", "label": "Year", "min": 2000, "max": 2025, "steps": true, "command": "pick-year" },
-    { "kind": "button", "command": "reset" }
+    { "kind": "button", "command": "reset" },
+    { "kind": "tree", "id": "catalogue", "label": "Catalogue", "search": true, "command": "show" }
   ]
 }
 ```
 
+A tree shows nodes the plugin gives (themes and their datasets, say), at most 5,000 of them and 8
+levels deep. `search: true` adds a box above it that RustGIS filters on its own, as the Layers
+pane's: the plugin only hears of the node the user chooses.
+
 RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
-read them with `req.panel_bool("visible-only")` and `req.panel_i64("year")` (`req.changed("year")`
-says whether this call set it), and answer the panel's new state with a `Panel`:
+read them with `req.panel_bool("visible-only")`, `req.panel_i64("year")` and
+`req.panel_str("catalogue")` (a tree's chosen node id, `None` when nothing is chosen;
+`req.changed("year")` says whether this call set it), and answer the panel's new state with a
+`Panel`:
 
 ```rust
-use rustgis_plugin::Panel;
+use rustgis_plugin::{Node, Panel};
 
 let panel = Panel::new().value("year", 2020).text("summary", "3 layers").enabled("reset", true);
 Ok(panel.answer(json!({"year": 2020}))) // {"year": 2020, "panel": {...}}
+```
+
+A tree gets its nodes the same way; a node's id is what `panel_str` gives when it is chosen, so
+it must be unique in the tree:
+
+```rust
+let env = Node::new("env", "Environment").count(2).children([Node::new("parks", "Parks"), Node::new("rivers", "Rivers")]);
+let panel = Panel::new().nodes("catalogue", [env, Node::new("roads", "Roads")]);
 ```
 
 See [A panel](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#a-panel) in

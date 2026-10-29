@@ -89,8 +89,9 @@ pub struct Request {
     /// The interface language's code (`en`, `de`, `zh`…): word messages in it with [`Request::tr`].
     pub lang: String,
     /// For a plugin with a panel: its widgets' values, by widget id (a checkbox's `true` or
-    /// `false`, a slider's whole number), whatever ran the command. Empty otherwise. Read one
-    /// with [`Request::panel_bool`] or [`Request::panel_i64`].
+    /// `false`, a slider's whole number, a tree's chosen node id or `null`), whatever ran the
+    /// command. Empty otherwise. Read one with [`Request::panel_bool`], [`Request::panel_i64`] or
+    /// [`Request::panel_str`].
     pub panel: Map<String, Value>,
     /// The panel widgets this call set: the one the user just moved, or those a script gave.
     pub panel_changed: Vec<String>,
@@ -137,6 +138,11 @@ impl Request {
     pub fn panel_i64(&self, id: &str) -> Option<i64> {
         let v = self.panel.get(id)?;
         v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64))
+    }
+
+    /// A panel tree's chosen node id; `None` when nothing is chosen.
+    pub fn panel_str(&self, id: &str) -> Option<&str> {
+        self.panel.get(id).and_then(Value::as_str)
     }
 
     /// Whether this call set the panel widget `id` (the user just moved it).
@@ -365,7 +371,8 @@ impl Panel {
         Panel::default()
     }
 
-    /// Sets a checkbox (`true`/`false`) or a slider (a whole number).
+    /// Sets a checkbox (`true`/`false`), a slider (a whole number) or a tree (a node's id, or
+    /// `Value::Null` to choose nothing).
     pub fn value(mut self, id: &str, value: impl Into<Value>) -> Panel {
         self.values.insert(id.into(), value.into());
         self
@@ -397,6 +404,12 @@ impl Panel {
         if labels.is_empty() { p } else { p.item(id, "labels", json!(labels)) }
     }
 
+    /// Gives a tree its nodes, replacing the ones it had. RustGIS keeps at most 5,000 nodes, 8
+    /// levels deep, and leaves out a node whose id is taken already (with its children).
+    pub fn nodes(self, id: &str, nodes: impl IntoIterator<Item = Node>) -> Panel {
+        self.item(id, "nodes", nodes.into_iter().map(Value::from).collect())
+    }
+
     /// `answer` (the command's own answer) with this state as its `panel`. An answer that isn't
     /// an object becomes `{"answer": answer, "panel": ...}`, and `null` just `{"panel": ...}`.
     /// Or put `Value::from(panel)` in the answer yourself.
@@ -420,6 +433,57 @@ impl Panel {
 impl From<Panel> for Value {
     fn from(p: Panel) -> Value {
         json!({"values": p.values, "items": p.items})
+    }
+}
+
+/// A node of a panel tree: its `id` is the tree's value when it is chosen, unique in the tree.
+///
+/// ```ignore
+/// let env = Node::new("env", "Environment").child(Node::new("parks", "Parks")).count(1);
+/// let panel = Panel::new().nodes("catalogue", [env]);
+/// ```
+#[derive(Clone, Debug, PartialEq)]
+pub struct Node {
+    pub id: String,
+    pub label: String,
+    /// A number shown at the right of the row (how many datasets a theme holds, say).
+    pub count: Option<u64>,
+    pub children: Vec<Node>,
+}
+
+impl Node {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Node {
+        Node { id: id.into(), label: label.into(), count: None, children: Vec::new() }
+    }
+
+    pub fn count(mut self, count: u64) -> Node {
+        self.count = Some(count);
+        self
+    }
+
+    pub fn child(mut self, node: Node) -> Node {
+        self.children.push(node);
+        self
+    }
+
+    pub fn children(mut self, nodes: impl IntoIterator<Item = Node>) -> Node {
+        self.children.extend(nodes);
+        self
+    }
+}
+
+impl From<Node> for Value {
+    fn from(n: Node) -> Value {
+        let mut m = Map::new();
+        m.insert("id".into(), Value::String(n.id));
+        m.insert("label".into(), Value::String(n.label));
+        if let Some(count) = n.count {
+            m.insert("count".into(), json!(count));
+        }
+        if !n.children.is_empty() {
+            m.insert("children".into(), n.children.into_iter().map(Value::from).collect());
+        }
+        Value::Object(m)
     }
 }
 
@@ -687,6 +751,31 @@ mod tests {
         let a = Panel::new().text("t", "x").answer(json!({"year": 1}));
         assert_eq!(a, json!({"year": 1, "panel": {"values": {}, "items": {"t": {"text": "x"}}}}));
         assert_eq!(Panel::new().answer(json!(7))["answer"], 7);
+    }
+
+    #[test]
+    fn panel_trees_take_nodes_and_give_the_chosen_one() {
+        let r = Request::parse(json!({"abi": ABI, "kind": "command", "id": "show", "params": {},
+            "panel": {"values": {"catalogue": "parks", "empty": null, "local": true}, "changed": ["catalogue"]}}));
+        assert_eq!(
+            (r.panel_str("catalogue"), r.panel_str("empty"), r.panel_str("local"), r.panel_str("gone")),
+            (Some("parks"), None, None, None)
+        );
+
+        let env = Node::new("env", "Environment").count(2).child(Node::new("parks", "Parks")).children([Node::new("rivers", "Rivers")]);
+        let p: Value = Panel::new().nodes("catalogue", [env, Node::new("roads", "Roads")]).value("catalogue", "parks").into();
+        assert_eq!(
+            p,
+            json!({"values": {"catalogue": "parks"}, "items": {"catalogue": {"nodes": [
+                {"id": "env", "label": "Environment", "count": 2, "children": [
+                    {"id": "parks", "label": "Parks"}, {"id": "rivers", "label": "Rivers"}
+                ]},
+                {"id": "roads", "label": "Roads"}
+            ]}}})
+        );
+        // Choosing nothing, and emptying a tree.
+        let p: Value = Panel::new().nodes("catalogue", []).value("catalogue", Value::Null).into();
+        assert_eq!(p, json!({"values": {"catalogue": null}, "items": {"catalogue": {"nodes": []}}}));
     }
 
     #[test]
