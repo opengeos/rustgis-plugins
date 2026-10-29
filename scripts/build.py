@@ -71,7 +71,7 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
-PANEL_KINDS = {"text", "checkbox", "slider", "button"}
+PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree"}
 # RustGIS's panel limits (crates/plugins/src/panel.rs).
 PANEL_TITLE = 48
 PANEL_DECLARED = 2_000
@@ -446,7 +446,8 @@ def whole(v: object) -> int | None:
 
 
 def check_panel_item(item: dict, kind: str, where: str) -> None:
-    """Checks a panel widget's fields: which kinds take which, and a slider's range and default.
+    """Checks a panel widget's fields: which kinds take which, a slider's range and default, and a
+    tree's search.
 
     Args:
         item: The widget, an object with a known `kind`.
@@ -463,6 +464,10 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         problem(f"{where}: a checkbox needs a label")
     if kind != "text" and item.get("text"):
         problem(f"{where}: text is for texts")
+    if not isinstance(item.get("search", False), bool):
+        problem(f"{where}: search is true or false")
+    elif kind != "tree" and item.get("search", False):
+        problem(f"{where}: search is for trees")
     lo, hi = item.get("min", 0), item.get("max", 0)
     if kind != "slider":
         if lo != 0 or hi != 0 or item.get("steps", False):
