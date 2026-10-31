@@ -1,0 +1,10 @@
+{
+  "id": "brasildata",
+  "source": {
+    "url": "https://github.com/elpidioassinaturas/BrasilData/releases/download/v0.1.0/brasildata-0.1.0.rgplugin",
+    "sha256": "782de0f328b89e418119245386d1d7dbaeeff06984e412a8a44ab01efdb7cfb1"
+  },
+  "categories": [
+    "Data"
+  ]
+}
