@@ -1,0 +1,11 @@
+{
+  "id": "strahler",
+  "source": {
+    "url": "https://github.com/arielsrossi/rustgis-strahler/releases/download/v0.2.1/strahler-0.2.1.rgplugin",
+    "sha256": "74298dd49f04b30c2ffe2205f30556ed00e8202172310b95acf6baa6edd952ff"
+  },
+  "categories": [
+    "Analysis",
+    "Vector"
+  ]
+}
