@@ -1,8 +1,8 @@
 {
   "id": "ide-chile",
   "source": {
-    "url": "https://github.com/DanielD-S/rustgis-ide-chile/releases/download/v0.6.1/ide-chile-0.6.1.rgplugin",
-    "sha256": "1eda83e4455431021a09266ca5fe182369b24b39d68bc08d33b5e889e5175640"
+    "url": "https://github.com/DanielD-S/rustgis-ide-chile/releases/download/v0.6.2/ide-chile-0.6.2.rgplugin",
+    "sha256": "54df176114856e3e245dd6ea728f02541b7562ab68ad46579854bad60a299757"
   },
   "categories": [
     "Data",
