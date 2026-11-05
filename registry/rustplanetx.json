@@ -1,0 +1,11 @@
+{
+  "id": "rustplanetx",
+  "source": {
+    "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.1.0/rustplanetx-0.1.0.rgplugin",
+    "sha256": "22ca8101ba0a5f2571cca5e1b808f3348337e9f3ebfe3dbc439326d309c5af49"
+  },
+  "categories": [
+    "Basemaps",
+    "Imagery"
+  ]
+}
