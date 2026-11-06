@@ -1,0 +1,11 @@
+{
+  "id": "rustplanetx",
+  "source": {
+    "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.4.0/rustplanetx-0.4.0.rgplugin",
+    "sha256": "68646a59a8049d4b01325e8e0950ca8faab441b52faf0d940cdc7dff27d0b3f3"
+  },
+  "categories": [
+    "Visualization",
+    "Terrain"
+  ]
+}
