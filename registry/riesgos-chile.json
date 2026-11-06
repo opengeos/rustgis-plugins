@@ -1,8 +1,8 @@
 {
   "id": "riesgos-chile",
   "source": {
-    "url": "https://github.com/DanielD-S/rustgis-riesgos-chile/releases/download/v0.1.0/riesgos-chile-0.1.0.rgplugin",
-    "sha256": "e751f840442f56050e8015f29e5a585a6b903f59d90abac697d63df6a0c5045f"
+    "url": "https://github.com/DanielD-S/rustgis-riesgos-chile/releases/download/v0.1.1/riesgos-chile-0.1.1.rgplugin",
+    "sha256": "40ef34e1e1917b3378ed17ffd62375c220a7fc209f97cf0a727e77e1edeba764"
   },
   "categories": [
     "Data"
