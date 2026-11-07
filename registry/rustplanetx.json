@@ -1,8 +1,8 @@
 {
   "id": "rustplanetx",
   "source": {
-    "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.4.1/rustplanetx-0.4.1.rgplugin",
-    "sha256": "5c24b9877a8c753573cf4b1481c09829e92837610b79ab56270a45046fb4047d"
+    "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.4.2/rustplanetx-0.4.2.rgplugin",
+    "sha256": "0f0fd64d0dee2de15b07c7fc88ed459f940f6e784c5429c60e96ab78147aa232"
   },
   "categories": [
     "Visualization",
