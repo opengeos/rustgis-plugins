@@ -1,0 +1,13 @@
+{
+  "id": "polish-geodata",
+  "source": {
+    "url": "https://github.com/Wolren/rustgis-polish-geodata/releases/download/v0.1.1/polish-geodata-0.1.1.rgplugin",
+    "sha256": "ade46ff4d7ca9b0d23b748704eece42979b577e5a47fa1de71f5fe6e261ea641"
+  },
+  "categories": [
+    "Data",
+    "Vector",
+    "Basemaps",
+    "Raster"
+  ]
+}
