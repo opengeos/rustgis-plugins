@@ -140,9 +140,19 @@ impl Request {
         v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64))
     }
 
-    /// A panel tree's chosen node id; `None` when nothing is chosen.
+    /// A panel tree's chosen node id, a dropdown's chosen option id or a date (`YYYY-MM-DD`);
+    /// `None` when nothing is chosen.
     pub fn panel_str(&self, id: &str) -> Option<&str> {
         self.panel.get(id).and_then(Value::as_str)
+    }
+
+    /// A panel range's low and high values.
+    pub fn panel_range(&self, id: &str) -> Option<(i64, i64)> {
+        let whole = |v: &Value| v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64));
+        match self.panel.get(id)?.as_array()?.as_slice() {
+            [a, b] => Some((whole(a)?, whole(b)?)),
+            _ => None,
+        }
     }
 
     /// Whether this call set the panel widget `id` (the user just moved it).
@@ -371,8 +381,9 @@ impl Panel {
         Panel::default()
     }
 
-    /// Sets a checkbox (`true`/`false`), a slider (a whole number) or a tree (a node's id, or
-    /// `Value::Null` to choose nothing).
+    /// Sets a checkbox (`true`/`false`), a slider (a whole number), a range (`json!([low,
+    /// high])`), a tree or a dropdown (a node's or an option's id, or `Value::Null` to choose
+    /// nothing) or a date (`"YYYY-MM-DD"`, or `Value::Null`).
     pub fn value(mut self, id: &str, value: impl Into<Value>) -> Panel {
         self.values.insert(id.into(), value.into());
         self
@@ -398,7 +409,8 @@ impl Panel {
         self.item(id, "visible", Value::Bool(visible))
     }
 
-    /// Sets a slider's ends and, when `labels` isn't empty, a label for each value from `min`.
+    /// Sets a slider's or a range's ends and, when `labels` isn't empty, a label for each value
+    /// from `min`.
     pub fn slider(self, id: &str, min: i64, max: i64, labels: &[String]) -> Panel {
         let p = self.item(id, "min", json!(min)).item(id, "max", json!(max));
         if labels.is_empty() { p } else { p.item(id, "labels", json!(labels)) }
@@ -408,6 +420,12 @@ impl Panel {
     /// levels deep, and leaves out a node whose id is taken already (with its children).
     pub fn nodes(self, id: &str, nodes: impl IntoIterator<Item = Node>) -> Panel {
         self.item(id, "nodes", nodes.into_iter().map(Value::from).collect())
+    }
+
+    /// Gives a dropdown (`choice`) its options, replacing the ones it had: `Node`s whose children
+    /// are ignored. RustGIS keeps at most 1,000, and leaves out an option whose id is taken already.
+    pub fn options(self, id: &str, options: impl IntoIterator<Item = Node>) -> Panel {
+        self.item(id, "options", options.into_iter().map(|n| Value::from(Node { children: Vec::new(), ..n })).collect())
     }
 
     /// `answer` (the command's own answer) with this state as its `panel`. An answer that isn't
@@ -776,6 +794,25 @@ mod tests {
         // Choosing nothing, and emptying a tree.
         let p: Value = Panel::new().nodes("catalogue", []).value("catalogue", Value::Null).into();
         assert_eq!(p, json!({"values": {"catalogue": null}, "items": {"catalogue": {"nodes": []}}}));
+    }
+
+    #[test]
+    fn panel_dropdowns_dates_and_ranges() {
+        let r = Request::parse(json!({"abi": ABI, "kind": "command", "id": "show", "params": {},
+            "panel": {"values": {"product": "hls", "start": "2023-04-01", "months": [3, 7], "odd": [1.0, 2.0], "bad": [1], "none": null}, "changed": []}}));
+        assert_eq!((r.panel_str("product"), r.panel_str("start")), (Some("hls"), Some("2023-04-01")));
+        assert_eq!((r.panel_range("months"), r.panel_range("odd")), (Some((3, 7)), Some((1, 2))));
+        assert_eq!((r.panel_range("bad"), r.panel_range("none"), r.panel_range("product")), (None, None, None));
+
+        let with_child = Node::new("s1", "DSWx-S1").child(Node::new("x", "X"));
+        let p: Value = Panel::new().options("product", [Node::new("hls", "DSWx-HLS"), with_child]).value("months", json!([3, 7])).into();
+        assert_eq!(
+            p,
+            json!({"values": {"months": [3, 7]}, "items": {"product": {"options": [
+                {"id": "hls", "label": "DSWx-HLS"}, {"id": "s1", "label": "DSWx-S1"}
+            ]}}}),
+            "an option's children are dropped"
+        );
     }
 
     #[test]
