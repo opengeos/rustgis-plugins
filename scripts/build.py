@@ -71,7 +71,12 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
-PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree"}
+PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree", "choice", "date", "range"}
+# A dropdown's (choice's) most options, and the longest option id.
+PANEL_CHOICES = 1_000
+# The largest plugin.json RustGIS reads.
+MANIFEST_MAX = 512 * 1024
+PANEL_OPTION_ID = 200
 # RustGIS's panel limits (crates/plugins/src/panel.rs).
 PANEL_TITLE = 48
 PANEL_DECLARED = 2_000
@@ -445,9 +450,22 @@ def whole(v: object) -> int | None:
     return None
 
 
+def panel_date(s: object) -> bool:
+    """Whether `s` is a real date written YYYY-MM-DD (years 1 to 9999), as RustGIS reads one."""
+    # ASCII digits only: `\d` would take other scripts' digits, which RustGIS refuses.
+    if not isinstance(s, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", s):
+        return False
+    y, m, d = int(s[:4]), int(s[5:7]), int(s[8:])
+    if y < 1 or not 1 <= m <= 12:
+        return False
+    leap = (y % 4 == 0 and y % 100 != 0) or y % 400 == 0
+    days = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+    return 1 <= d <= days
+
+
 def check_panel_item(item: dict, kind: str, where: str) -> None:
-    """Checks a panel widget's fields: which kinds take which, a slider's range and default, and a
-    tree's search.
+    """Checks a panel widget's fields: which kinds take which, a slider's or a range's ends and
+    default, a dropdown's options, a date's default and a tree's search.
 
     Args:
         item: The widget, an object with a known `kind`.
@@ -468,26 +486,54 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         problem(f"{where}: search is true or false")
     elif kind != "tree" and item.get("search", False):
         problem(f"{where}: search is for trees")
+    options = item.get("options", [])
+    if kind != "choice" and "options" in item:
+        problem(f"{where}: options are for dropdowns (choice)")
+    ids: list[str] = []
+    if kind == "choice":
+        if not isinstance(options, list) or len(options) > PANEL_CHOICES:
+            problem(f"{where}: a dropdown's options are a list of at most {PANEL_CHOICES:,}")
+            return
+        for o in options:
+            oid = o.get("id") if isinstance(o, dict) else None
+            if not isinstance(oid, str) or not 1 <= len(oid) <= PANEL_OPTION_ID or oid in ids:
+                problem(f"{where}: each option is an object with a unique id of 1 to {PANEL_OPTION_ID} characters")
+                return
+            if not isinstance(o.get("label", ""), (str, type(None))):
+                problem(f"{where}: an option's label is text")
+            ids.append(oid)
     lo, hi = item.get("min", 0), item.get("max", 0)
-    if kind != "slider":
+    if kind not in ("slider", "range"):
         if lo != 0 or hi != 0 or item.get("steps", False):
-            problem(f"{where}: min, max and steps are for sliders")
-        if "default" in item and kind != "checkbox":
-            problem(f"{where}: only checkboxes and sliders have a default")
-        elif kind == "checkbox" and "default" in item and not isinstance(item["default"], bool):
+            problem(f"{where}: min, max and steps are for sliders and ranges")
+        if "default" not in item:
+            return
+        default = item["default"]
+        if kind == "checkbox" and not isinstance(default, bool):
             problem(f"{where}: a checkbox's default is true or false")
+        elif kind == "choice" and default not in ids:
+            problem(f"{where}: a dropdown's default is the id of one of its options")
+        elif kind == "date" and not panel_date(default):
+            problem(f"{where}: a date's default is a date written YYYY-MM-DD")
+        elif kind not in ("checkbox", "choice", "date"):
+            problem(f"{where}: only checkboxes, sliders, ranges, dropdowns and dates have a default")
         return
     if not isinstance(item.get("steps", False), bool):
         problem(f"{where}: steps is true or false")
     if isinstance(lo, bool) or isinstance(hi, bool) or not isinstance(lo, int) or not isinstance(hi, int):
-        problem(f"{where}: a slider's min and max are whole numbers")
+        problem(f"{where}: a slider's or a range's min and max are whole numbers")
         return
     if lo > hi or lo < -SLIDER_LIMIT or hi > SLIDER_LIMIT:
-        problem(f"{where}: a slider's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
-    if "default" in item:
+        problem(f"{where}: a slider's or a range's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
+    if "default" in item and kind == "slider":
         v = whole(item["default"])
         if v is None or not lo <= v <= hi:
             problem(f"{where}: a slider's default is a whole number from min to max")
+    elif "default" in item:
+        d = item["default"]
+        pair = [whole(v) for v in d] if isinstance(d, list) and len(d) == 2 else None
+        if pair is None or None in pair or not lo <= pair[0] <= pair[1] <= hi:
+            problem(f"{where}: a range's default is [low, high], whole numbers from min to max, low first")
 
 
 def check_module(wasm: bytes, where: str) -> None:
@@ -529,6 +575,10 @@ def read_package(data: bytes, where: str) -> tuple[dict, bytes] | None:
             root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), None)
             if root is None:
                 problem(f"{where}: the package has no plugin.json")
+                return None
+            # RustGIS reads at most 512 KiB of plugin.json (a dropdown's options can grow it).
+            if z.getinfo(root + "plugin.json").file_size > MANIFEST_MAX:
+                problem(f"{where}: plugin.json is larger than {MANIFEST_MAX // 1024} KiB, which RustGIS refuses")
                 return None
             manifest = json.loads(z.read(root + "plugin.json"))
             # A process plugin has no module: its files are checked by check_process().
