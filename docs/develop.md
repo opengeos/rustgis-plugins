@@ -272,7 +272,9 @@ way.
 A tree shows nodes the plugin gives (themes and their datasets, say), at most 5,000 of them and 8
 levels deep. `search: true` adds a box above it that RustGIS filters on its own, as the Layers
 pane's: the plugin only hears of the node the user chooses. A dropdown (`choice`) lists options
-from `plugin.json` or the plugin (at most 1,000); a date is a box for `YYYY-MM-DD` with a
+from `plugin.json` or the plugin (at most 1,000; a `default` must be one of the options
+`plugin.json` declares, so a dropdown filled at run time sets its value from the plugin); a date
+is a box for `YYYY-MM-DD` with a
 calendar; a range is a slider with two handles, its value `[low, high]`.
 
 RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
