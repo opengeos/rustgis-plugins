@@ -1,0 +1,12 @@
+{
+  "id": "nasa-opera",
+  "source": {
+    "url": "https://github.com/opengeos/rustgis-nasa-opera/releases/download/v0.2.0/nasa-opera-0.2.0.rgplugin",
+    "sha256": "32d99b5677eee86390763a8c48d74d7b5fd22c84949ec8128dc53032ad133b9a"
+  },
+  "categories": [
+    "Imagery",
+    "Hydrology",
+    "Data"
+  ]
+}
