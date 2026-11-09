@@ -1,8 +1,8 @@
 {
   "id": "polish-geodata",
   "source": {
-    "url": "https://github.com/Wolren/rustgis-polish-geodata/releases/download/v0.1.1/polish-geodata-0.1.1.rgplugin",
-    "sha256": "ade46ff4d7ca9b0d23b748704eece42979b577e5a47fa1de71f5fe6e261ea641"
+    "url": "https://github.com/Wolren/rustgis-polish-geodata/releases/download/v0.1.4/polish-geodata-0.1.4.rgplugin",
+    "sha256": "c75850b5dcc5db14171a3cc3ee82515dd8f4c012ca8a4721cdb6cece821c6b0d"
   },
   "categories": [
     "Data",
