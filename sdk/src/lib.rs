@@ -136,8 +136,7 @@ impl Request {
 
     /// A panel slider's value (a whole number, even when written as `196.0`).
     pub fn panel_i64(&self, id: &str) -> Option<i64> {
-        let v = self.panel.get(id)?;
-        v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64))
+        whole(self.panel.get(id)?)
     }
 
     /// A panel tree's chosen node id, a dropdown's chosen option id or a date (`YYYY-MM-DD`);
@@ -146,11 +145,10 @@ impl Request {
         self.panel.get(id).and_then(Value::as_str)
     }
 
-    /// A panel range's low and high values.
+    /// A panel range's low and high values; `None` unless it is two whole numbers, low first.
     pub fn panel_range(&self, id: &str) -> Option<(i64, i64)> {
-        let whole = |v: &Value| v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64));
         match self.panel.get(id)?.as_array()?.as_slice() {
-            [a, b] => Some((whole(a)?, whole(b)?)),
+            [a, b] => Some((whole(a)?, whole(b)?)).filter(|(a, b)| a <= b),
             _ => None,
         }
     }
@@ -363,6 +361,14 @@ impl From<ToolOutput> for Value {
     }
 }
 
+/// A whole number, even when written as `196.0`.
+fn whole(v: &Value) -> Option<i64> {
+    v.as_i64().or_else(|| v.as_f64().filter(|x| x.fract() == 0.0 && x.abs() < 9.0e15).map(|x| x as i64))
+}
+
+/// The most options RustGIS keeps in a dropdown.
+pub const MAX_OPTIONS: usize = 1_000;
+
 /// A panel's new state, which any command of a plugin with a panel can answer beside the rest
 /// of its answer. What it leaves out stays as it was.
 ///
@@ -423,9 +429,17 @@ impl Panel {
     }
 
     /// Gives a dropdown (`choice`) its options, replacing the ones it had: `Node`s whose children
-    /// are ignored. RustGIS keeps at most 1,000, and leaves out an option whose id is taken already.
+    /// are ignored. As RustGIS does, an option with an empty id or one taken already is left out,
+    /// and only the first [`MAX_OPTIONS`] are kept (so a long iterator stops there).
     pub fn options(self, id: &str, options: impl IntoIterator<Item = Node>) -> Panel {
-        self.item(id, "options", options.into_iter().map(|n| Value::from(Node { children: Vec::new(), ..n })).collect())
+        let mut seen = std::collections::HashSet::new();
+        let kept: Vec<Value> = options
+            .into_iter()
+            .filter(|n| !n.id.is_empty() && seen.insert(n.id.clone()))
+            .take(MAX_OPTIONS)
+            .map(|n| Value::from(Node { children: Vec::new(), ..n }))
+            .collect();
+        self.item(id, "options", Value::Array(kept))
     }
 
     /// `answer` (the command's own answer) with this state as its `panel`. An answer that isn't
@@ -799,10 +813,13 @@ mod tests {
     #[test]
     fn panel_dropdowns_dates_and_ranges() {
         let r = Request::parse(json!({"abi": ABI, "kind": "command", "id": "show", "params": {},
-            "panel": {"values": {"product": "hls", "start": "2023-04-01", "months": [3, 7], "odd": [1.0, 2.0], "bad": [1], "none": null}, "changed": []}}));
+            "panel": {"values": {"product": "hls", "start": "2023-04-01", "months": [3, 7], "odd": [1.0, 2.0], "bad": [1], "none": null,
+                "inverted": [7, 3], "frac-low": [1.5, 2], "frac-high": [1, 2.5]}, "changed": []}}));
         assert_eq!((r.panel_str("product"), r.panel_str("start")), (Some("hls"), Some("2023-04-01")));
         assert_eq!((r.panel_range("months"), r.panel_range("odd")), (Some((3, 7)), Some((1, 2))));
         assert_eq!((r.panel_range("bad"), r.panel_range("none"), r.panel_range("product")), (None, None, None));
+        assert_eq!(r.panel_range("inverted"), None, "low first");
+        assert_eq!((r.panel_range("frac-low"), r.panel_range("frac-high")), (None, None), "whole numbers only");
 
         let with_child = Node::new("s1", "DSWx-S1").child(Node::new("x", "X"));
         let p: Value = Panel::new().options("product", [Node::new("hls", "DSWx-HLS"), with_child]).value("months", json!([3, 7])).into();
@@ -813,6 +830,11 @@ mod tests {
             ]}}}),
             "an option's children are dropped"
         );
+        // Repeated and empty ids are left out, and at most MAX_OPTIONS are kept, from a lazy source too.
+        let p: Value = Panel::new().options("p", [Node::new("a", "A"), Node::new("a", "again"), Node::new("", "none")]).into();
+        assert_eq!(p["items"]["p"]["options"], json!([{"id": "a", "label": "A"}]));
+        let p: Value = Panel::new().options("p", (0..).map(|i| Node::new(format!("o{i}"), "x"))).into();
+        assert_eq!(p["items"]["p"]["options"].as_array().map(Vec::len), Some(MAX_OPTIONS));
     }
 
     #[test]

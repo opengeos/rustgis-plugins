@@ -74,6 +74,8 @@ PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "n
 PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree", "choice", "date", "range"}
 # A dropdown's (choice's) most options, and the longest option id.
 PANEL_CHOICES = 1_000
+# The largest plugin.json RustGIS reads.
+MANIFEST_MAX = 512 * 1024
 PANEL_OPTION_ID = 200
 # RustGIS's panel limits (crates/plugins/src/panel.rs).
 PANEL_TITLE = 48
@@ -450,7 +452,8 @@ def whole(v: object) -> int | None:
 
 def panel_date(s: object) -> bool:
     """Whether `s` is a real date written YYYY-MM-DD (years 1 to 9999), as RustGIS reads one."""
-    if not isinstance(s, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+    # ASCII digits only: `\d` would take other scripts' digits, which RustGIS refuses.
+    if not isinstance(s, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", s):
         return False
     y, m, d = int(s[:4]), int(s[5:7]), int(s[8:])
     if y < 1 or not 1 <= m <= 12:
@@ -572,6 +575,10 @@ def read_package(data: bytes, where: str) -> tuple[dict, bytes] | None:
             root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), None)
             if root is None:
                 problem(f"{where}: the package has no plugin.json")
+                return None
+            # RustGIS reads at most 512 KiB of plugin.json (a dropdown's options can grow it).
+            if z.getinfo(root + "plugin.json").file_size > MANIFEST_MAX:
+                problem(f"{where}: plugin.json is larger than {MANIFEST_MAX // 1024} KiB, which RustGIS refuses")
                 return None
             manifest = json.loads(z.read(root + "plugin.json"))
             # A process plugin has no module: its files are checked by check_process().
