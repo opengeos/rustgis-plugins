@@ -5,14 +5,9 @@
     "sha256": "e12d093d4e7d09aaca0b0e16b2e28c82a3d79f4e3b8c9e8eacb31ab3752f18eb"
   },
   "categories": [
-    "Data",
     "Basemaps",
     "Cartography",
-    "Hydrology",
-    "Imagery",
-    "Raster",
-    "Terrain",
-    "Vector",
-    "Visualization"
+    "Data",
+    "Vector"
   ]
 }
