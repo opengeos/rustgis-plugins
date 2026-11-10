@@ -243,11 +243,12 @@ an example.
 ## A panel
 
 A plugin can have a panel: a pane on the right of the map with texts, checkboxes, sliders,
-buttons and trees bound to its commands. Its button comes first in the plugin's group on the
+buttons, trees, dropdowns, date pickers and range sliders bound to its commands. Its button comes first in the plugin's group on the
 **Plugins** tab; on a tab of its own, put `panel` among a group's items. Panels need a RustGIS
 newer than 0.3.0, which ignores them (keep the commands usable from the ribbon too). Trees need
 one newer than 0.4.0, which refuses a manifest with a tree: set `minRustgisVersion` to the first
-release with them.
+release with them. Dropdowns (`choice`), dates and ranges need one newer than 0.6.0 in the same
+way.
 
 ```json
 "panel": {
@@ -260,18 +261,26 @@ release with them.
     { "kind": "checkbox", "id": "visible-only", "label": "Visible layers only", "command": "panel-state" },
     { "kind": "slider", "id": "year", "label": "Year", "min": 2000, "max": 2025, "steps": true, "command": "pick-year" },
     { "kind": "button", "command": "reset" },
-    { "kind": "tree", "id": "catalogue", "label": "Catalogue", "search": true, "command": "show" }
+    { "kind": "tree", "id": "catalogue", "label": "Catalogue", "search": true, "command": "show" },
+    { "kind": "choice", "id": "theme", "label": "Theme", "options": [{ "id": "env", "label": "Environment" }], "default": "env" },
+    { "kind": "date", "id": "start", "label": "Start date", "default": "2024-01-01" },
+    { "kind": "range", "id": "years", "label": "Years", "min": 2000, "max": 2025, "default": [2010, 2020] }
   ]
 }
 ```
 
 A tree shows nodes the plugin gives (themes and their datasets, say), at most 5,000 of them and 8
 levels deep. `search: true` adds a box above it that RustGIS filters on its own, as the Layers
-pane's: the plugin only hears of the node the user chooses.
+pane's: the plugin only hears of the node the user chooses. A dropdown (`choice`) lists options
+from `plugin.json` or the plugin (at most 1,000; a `default` must be one of the options
+`plugin.json` declares, so a dropdown filled at run time sets its value from the plugin); a date
+is a box for `YYYY-MM-DD` with a
+calendar; a range is a slider with two handles, its value `[low, high]`.
 
 RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
 read them with `req.panel_bool("visible-only")`, `req.panel_i64("year")` and
-`req.panel_str("catalogue")` (a tree's chosen node id, `None` when nothing is chosen;
+`req.panel_str("catalogue")` (a tree's chosen node id, a dropdown's chosen option id or a date,
+`None` when nothing is chosen), `req.panel_range("years")` (a range's `(low, high)`;
 `req.changed("year")` says whether this call set it), and answer the panel's new state with a
 `Panel`:
 
@@ -288,6 +297,13 @@ it must be unique in the tree:
 ```rust
 let env = Node::new("env", "Environment").count(2).children([Node::new("parks", "Parks"), Node::new("rivers", "Rivers")]);
 let panel = Panel::new().nodes("catalogue", [env, Node::new("roads", "Roads")]);
+```
+
+A dropdown gets its options with `options` (nodes whose children are ignored), and a range its
+value as `[low, high]`:
+
+```rust
+let panel = Panel::new().options("theme", [Node::new("env", "Environment"), Node::new("farm", "Farming")]).value("years", json!([2010, 2020]));
 ```
 
 See [A panel](https://github.com/opengeos/RustGIS/blob/main/docs/plugins.md#a-panel) in
