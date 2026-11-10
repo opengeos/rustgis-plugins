@@ -1,0 +1,13 @@
+{
+  "id": "ide-bogota",
+  "source": {
+    "url": "https://github.com/jgregoriorincon/rustgis-ide-bogota/releases/download/ide-bogota-v0.3.6/ide-bogota-0.3.6.rgplugin",
+    "sha256": "99dd11d735638b9b80d954367a8152e45b3a3f34cc5182c0b4708d251c0f9c4b"
+  },
+  "categories": [
+    "Basemaps",
+    "Cartography",
+    "Data",
+    "Vector"
+  ]
+}
