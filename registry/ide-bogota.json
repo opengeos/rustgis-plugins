@@ -1,8 +1,8 @@
 {
   "id": "ide-bogota",
   "source": {
-    "url": "https://github.com/jgregoriorincon/rustgis-ide-bogota/releases/download/ide-bogota-v0.3.3/ide-bogota-0.3.3.rgplugin",
-    "sha256": "96adef62d619aebe16c28077f953a254a906a2aba638fdf5478b5bee5a8874cc"
+    "url": "https://github.com/jgregoriorincon/rustgis-ide-bogota/releases/download/ide-bogota-v0.3.5/ide-bogota-0.3.5.rgplugin",
+    "sha256": "fb460d67d9b6ee30dee636f8ce6ea96a06e2700299b9169a741cf535d39978ab"
   },
   "categories": [
     "Basemaps",
