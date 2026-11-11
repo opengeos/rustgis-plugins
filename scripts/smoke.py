@@ -6,9 +6,11 @@
     python scripts/smoke.py --runtime wasm|process ...           # only WebAssembly or process plugins
 
 For each plugin: RustGIS must load it and list its commands; each tool runs with its defaults
-(layer parameters get a sample layer of the right kind) and must succeed; each command that
-needs no parameters runs too (a failure there is reported but doesn't fail the check, since a
-command may need a selection or a layer the sample doesn't have).
+(layer parameters get a sample layer of the right kind) and must succeed, unless a service that it
+reads refuses the client (HTTP 401, 403 or 429, or a server error). That is reported as a skip: the
+check tests the plugin, and a service can refuse a runner's address whatever the plugin sends. Each
+command that needs no parameters runs too (a failure there is reported but doesn't fail the check,
+since a command may need a selection or a layer the sample doesn't have).
 
 A process plugin ("runtime": "process") runs from its unpacked files, so it is installed into a
 scratch plugins folder first (`rustgis-cli plugins install`), run as installed, and uninstalled.
@@ -23,6 +25,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -188,6 +191,28 @@ def main() -> int:
     return 1 if failures else 0
 
 
+# A service that answers one of these refused the client itself: no credentials, its own policy
+# against this address, a rate limit or a broken server. The request may be exactly right.
+REFUSED = (401, 403, 429)
+STATUS = re.compile(r"HTTP (\d{3}) from https?://")
+
+
+def refused_status(stderr: str) -> str | None:
+    """The HTTP status a service answered when it refused the client, not the request.
+
+    Args:
+        stderr: What the tool run wrote to its error stream.
+
+    Returns:
+        The status as text, or None when the run failed for any other reason.
+    """
+    for match in STATUS.finditer(stderr):
+        code = int(match.group(1))
+        if code in REFUSED or 500 <= code < 600:
+            return str(code)
+    return None
+
+
 def exercise(cli: str, package: Path, pid: str, manifest: dict, env: dict, installed: bool) -> int:
     """Loads a plugin in rustgis-cli and runs its commands and tools on the sample.
 
@@ -234,6 +259,10 @@ def exercise(cli: str, package: Path, pid: str, manifest: dict, env: dict, insta
         r = run(cli, package, [cmd], env, installed)
         if r.returncode == 0:
             print(f"   tool {t['id']}: ok")
+            continue
+        refused = refused_status(r.stderr)
+        if refused:
+            print(f"   tool {t['id']}: skipped (the service answered HTTP {refused})")
         else:
             print(f"error: tool {t['id']} failed: {r.stderr.strip()}")
             failures += 1
