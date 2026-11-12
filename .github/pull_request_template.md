@@ -11,5 +11,5 @@ code here are closed.
 
 **How I tested it:** <!-- RustGIS version, desktop / web / CLI -->
 
-- [ ] The entry's `source.url` is a release asset of the plugin's repository, and `sha256` is that file's.
+- [ ] The entry's `source.url` is a release asset of the plugin's repository, and `sha256` is that file's (for a package per platform: each platform's `url` and `sha256`).
 - [ ] The plugin asks only for the permissions it uses.
