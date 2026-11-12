@@ -79,8 +79,8 @@ limit and the preview's 25 MiB). Name them by platform in `source`, in place of 
   RustGIS downloads the one for the platform it runs on, and elsewhere lists the plugin as
   *Not available* with the platforms it has.
 - The packages are one plugin: the same `plugin.json` (id, version, permissions, commands, tools)
-  in each, except `run`, which names that platform's program. CI refuses packages that differ in
-  anything else.
+  in each, except `run`, which names that platform's program. CI refuses packages whose
+  `plugin.json` differs in anything else; the reviewer checks that their code is the same.
 - This is for process plugins. A WebAssembly module runs everywhere and has one package.
 - Each package is served from
   `packages.rustgis.app/my-plugin/my-plugin-<version>-<platform>.rgplugin`.

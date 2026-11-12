@@ -256,10 +256,11 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
         # Every package is either one this preview holds or a published one: a pull request
         # can't point an entry anywhere else. Each is checked on its own: a plugin can add one
         # platform's package to those already published.
-        bodies = []
+        bodies, listed = [], []
         for platform, r in refs.items():
             pkg = r["package"]
             if pkg.startswith(PUBLISHED):
+                listed.append(platform)
                 name = pkg.removeprefix(PUBLISHED)
                 named = name.split("/", 1)[0] == e.get("id") and name.endswith(f"-{platform}.rgplugin") if platform else True
                 if not PACKAGE_RE.fullmatch(name) or not named:
@@ -294,6 +295,14 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
         if not bodies:
             kept.append(e)
             continue
+        # Beside packages of this preview, a published one is previewed as the entry writes it:
+        # its hash and size must be the ones the published registry lists for that platform.
+        was = published.get(e.get("id")) if published is not None else None
+        was = was.get("packages") if isinstance(was, dict) else None
+        for platform in listed if published is not None else []:
+            if not isinstance(was, dict) or was.get(platform) != refs[platform]:
+                print(f"preview: {refs[platform]['package']!r} isn't listed with that sha256 and size in the published registry", file=sys.stderr)
+                return 1
         # Each plugin once, however often the registry lists it.
         if any(p.get("id") == e.get("id") for p in previewed):
             continue
