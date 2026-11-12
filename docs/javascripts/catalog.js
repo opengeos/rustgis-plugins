@@ -15,6 +15,12 @@
     network: ["Loads map tiles from the web", "Can add web tile layers, which the map loads from addresses the plugin chooses."],
     files: ["Reads and writes files", "Can run commands that read or write files on your computer."],
   };
+  // The platforms an entry can name a package for, as they are shown.
+  const PLATFORMS = [
+    ["windows", "Windows"],
+    ["macos", "macOS"],
+    ["linux", "Linux"],
+  ];
   // The puzzle-piece icon (Material Design Icons "puzzle").
   const PUZZLE =
     "M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5A2.5 2.5 0 0 0 10.5 1 2.5 2.5 0 0 0 8 3.5V5H4a2 2 0 0 0-2 2v3.8h1.5c1.5 0 2.7 1.2 2.7 2.7S5 16.2 3.5 16.2H2V20a2 2 0 0 0 2 2h3.8v-1.5c0-1.5 1.2-2.7 2.7-2.7s2.7 1.2 2.7 2.7V22H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5Z";
@@ -123,11 +129,16 @@
     for (const c of arr(p.categories)) tags.append(el("code", null, c), " ");
     if (tags.childNodes.length) li.append(tags);
     const links = el("p", "plugin-card-links");
-    const parts = [
-      link("Details", page(p.id)),
-      link(Number.isFinite(p.size) && p.size > 0 ? `Download (${size(p.size)})` : "Download", p.package),
-      link("Homepage", p.homepage, true),
-    ].filter(Boolean);
+    // One package, or one per platform (RustGIS downloads the one for its own).
+    const download = (label, pkg) =>
+      link(Number.isFinite(pkg.size) && pkg.size > 0 ? `${label} (${size(pkg.size)})` : label, pkg.package);
+    const byPlatform = p.packages && typeof p.packages === "object" ? p.packages : null;
+    const downloads = byPlatform
+      ? PLATFORMS.filter(([key]) => byPlatform[key] && typeof byPlatform[key] === "object").map(([key, name]) =>
+          download(name, byPlatform[key]),
+        )
+      : [download("Download", p)];
+    const parts = [link("Details", page(p.id)), ...downloads, link("Homepage", p.homepage, true)].filter(Boolean);
     parts.forEach((a, i) => {
       if (i) links.append(" · ");
       links.append(a);
