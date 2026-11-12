@@ -136,6 +136,14 @@ def main() -> int:
         for i, e in enumerate(registry["plugins"]):
             if i % n != k - 1:
                 continue
+            # A plugin with a package per platform is run from the one for Linux, as RustGIS
+            # here would download it.
+            if "packages" in e:
+                linux = e["packages"].get("linux")
+                if linux is None:
+                    print(f"== {e['id']} {e['version']}: no package for Linux, not run here (run it on its platforms by hand)")
+                    continue
+                e = {**e, **linux}
             # Built by this run, or (with --all) downloaded from the bucket.
             file_name = e["package"].rsplit("/", 1)[-1]
             package = DIST / "packages" / e["id"] / file_name

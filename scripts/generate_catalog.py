@@ -111,6 +111,26 @@ def load_manifests() -> dict:
     return {p["id"]: p.get("manifest") or {} for p in index.get("plugins", [])}
 
 
+# The platforms an entry can name a package for, as they are shown.
+PLATFORMS = {"windows": "Windows", "macos": "macOS", "linux": "Linux"}
+
+
+def packages_of(entry: dict) -> list[tuple[str, dict]]:
+    """The packages a registry entry names.
+
+    Args:
+        entry: A registry.json entry.
+
+    Returns:
+        Each package (its `package`, `sha256` and `size`) with the platform it is for, as
+        shown; the name is empty for a plugin's only package.
+    """
+    by_platform = entry.get("packages")
+    if not isinstance(by_platform, dict):
+        return [("", entry)]
+    return [(name, by_platform[key]) for key, name in PLATFORMS.items() if isinstance(by_platform.get(key), dict)]
+
+
 def size(n: int) -> str:
     """A package size in KB or MB.
 
@@ -173,8 +193,10 @@ def render_page(entry: dict, manifest: dict) -> str:
     # Kept out of the site search: the catalog searches plugins itself, and thousands of pages
     # would make the search index every visitor downloads several megabytes.
     front += "search:\n  exclude: true\n---\n\n"
+    packages = packages_of(entry)
     buttons = [
-        f"[:material-download: Download {text(entry.get('version', ''))}]({safe_url(entry['package'])}){{ .md-button .md-button--primary }}"
+        f"[:material-download: Download {text(entry.get('version', ''))}{' for ' + platform if platform else ''}]({safe_url(pkg['package'])}){{ .md-button .md-button--primary }}"
+        for platform, pkg in packages
     ]
     home = link(":octicons-mark-github-16: Homepage", entry.get("homepage"), "{ .md-button target=_blank }")
     if home:
@@ -192,7 +214,10 @@ def render_page(entry: dict, manifest: dict) -> str:
         rows.append(("Runs", f"as a program on your computer{python}: the desktop app and the command line only, not the web app"))
     if tags(entry.get("categories") or []):
         rows.append(("Categories", tags(entry["categories"])))
-    rows.append(("Package", f"{size(int(entry.get('size', 0)))}, SHA-256 `{entry.get('sha256', '')}`"))
+    if len(packages) > 1 or packages[0][0]:
+        rows.append(("Platforms", ", ".join(platform for platform, _ in packages) + ": RustGIS downloads the package for yours"))
+    for platform, pkg in packages:
+        rows.append((f"Package for {platform}" if platform else "Package", f"{size(int(pkg.get('size', 0)))}, SHA-256 `{pkg.get('sha256', '')}`"))
     body = [f"# {text(name)}", ""]
     if entry.get("description"):
         body += [text(entry["description"]), ""]
@@ -256,10 +281,10 @@ def render_page(entry: dict, manifest: dict) -> str:
         "",
         ("- **In RustGIS** (desktop): " if process else "- **In RustGIS** (desktop or [web](https://web.rustgis.app)): ")
         + f"open **Plugins › Plugin Manager › Browse**, find **{text(name)}** and choose **Install**. "
-        + "RustGIS checks the download against the SHA-256 above."
+        + ("RustGIS downloads the package for your platform and checks it against its SHA-256 above." if packages[0][0] else "RustGIS checks the download against the SHA-256 above.")
         + (" It then makes the plugin's Python environment, which downloads Python and its packages the first time." if entry.get("python") and process else ""),
         f"- **On the command line:** `rustgis-cli plugins get {pid}`.",
-        "- **From the file:** download the package, then choose **Plugins › Install From File** in RustGIS or run "
+        f"- **From the file:** download the package{' for your platform' if packages[0][0] else ''}, then choose **Plugins › Install From File** in RustGIS or run "
         "`rustgis-cli plugins install <file>`.",
         "",
     ]
@@ -292,7 +317,8 @@ def main() -> None:
     manifests = load_manifests()
     entries = []
     for e in registry.get("plugins", []):
-        if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not safe_url(e.get("package")):
+        packages = packages_of(e)
+        if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not packages or not all(safe_url(pkg.get("package")) for _, pkg in packages):
             raise SystemExit(f"refusing to write a page for {e.get('id')!r}")
         entries.append((e, manifests.get(e["id"], {})))
     (DOCS / "catalog.md").write_text(render_catalog(len(entries)))
