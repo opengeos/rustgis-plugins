@@ -1098,13 +1098,19 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         if not ID_RE.match(rid):
             notes.append(f"- `{f}`: invalid id, not inspected")
             continue
-        # One package, or one per platform: each is a program of its own to read.
+        # One package, or one per platform: each is a program of its own to read. Anything the
+        # review isn't shown is said.
         if "url" in source or "sha256" in source:
             sources = [(None, source)]
+            if extra := sorted(set(source) - {"url", "sha256"}):
+                notes.append(f"- `{rid}`: source has a package of its own and also '{cell(extra[0])}': a source is one package or packages by platform; only the one package was inspected")
+        elif not source:
+            sources = []
+            notes.append(f"- `{rid}`: source names no package; nothing inspected")
         else:
             sources = [(k, v) for k, v in sorted(source.items()) if k in PACKAGE_PLATFORMS and isinstance(v, dict)]
             for k in sorted(set(source) - {k for k, _ in sources}):
-                notes.append(f"- `{rid}`: source.{cell(k)} isn't a platform's package ({', '.join(PACKAGE_PLATFORMS)}); not inspected")
+                notes.append(f"- `{rid}`: source.{cell(str(k))} isn't a platform's package ({', '.join(PACKAGE_PLATFORMS)}, each with a url and sha256); not inspected")
         for platform, src in sources:
             inspect_package(rid, platform, src, out, known, rows, notes)
     report = ["# Packages this PR points at", ""]
@@ -1329,7 +1335,8 @@ def main() -> int:
             manifest = got[first][0]
             same = True
             for k, v in got.items():
-                differ = sorted(f for f in set(manifest) | set(v[0]) if f != "run" and manifest.get(f) != v[0].get(f))
+                # A field one package has and another lacks differs too, whatever its value.
+                differ = sorted(f for f in set(manifest) | set(v[0]) if f != "run" and ((f in manifest) != (f in v[0]) or manifest.get(f) != v[0].get(f)))
                 if differ:
                     problem(f"{where}: the {k} package's plugin.json differs from the {first} one in '{differ[0]}': the packages of a plugin differ only in 'run'")
                     same = False
@@ -1383,7 +1390,7 @@ def main() -> int:
                 **runtime_fields(manifest),
             }
         )
-    print(f"{len(new)} new packages")
+    print(f"{len(new)} new packages, {sum(len(p.get('platforms', [0])) for p in packages) - len(new)} already published")
 
     blocklist = json.loads((ROOT / "blocklist.json").read_text())
     for b in blocklist.get("blocked", []):

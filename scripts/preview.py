@@ -254,17 +254,18 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
             print("preview: an entry with no package", file=sys.stderr)
             return 1
         # Every package is either one this preview holds or a published one: a pull request
-        # can't point an entry anywhere else.
-        if all(r["package"].startswith(PUBLISHED) for r in refs.values()):
-            for r in refs.values():
-                if not PACKAGE_RE.fullmatch(r["package"].removeprefix(PUBLISHED)):
-                    print(f"preview: {r['package']!r} isn't a published package's address", file=sys.stderr)
-                    return 1
-            kept.append(e)
-            continue
+        # can't point an entry anywhere else. Each is checked on its own: a plugin can add one
+        # platform's package to those already published.
         bodies = []
         for platform, r in refs.items():
             pkg = r["package"]
+            if pkg.startswith(PUBLISHED):
+                name = pkg.removeprefix(PUBLISHED)
+                named = name.split("/", 1)[0] == e.get("id") and name.endswith(f"-{platform}.rgplugin") if platform else True
+                if not PACKAGE_RE.fullmatch(name) or not named:
+                    print(f"preview: {pkg!r} isn't a published package's address", file=sys.stderr)
+                    return 1
+                continue
             if not pkg.startswith("packages/"):
                 print(f"preview: {pkg!r} is neither in this preview nor published", file=sys.stderr)
                 return 1
@@ -289,6 +290,10 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
                 print(f"preview: the entry for {pkg!r} doesn't describe the package it names", file=sys.stderr)
                 return 1
             bodies.append((name, body))
+        # Nothing of it is in this preview: listed as published.
+        if not bodies:
+            kept.append(e)
+            continue
         # Each plugin once, however often the registry lists it.
         if any(p.get("id") == e.get("id") for p in previewed):
             continue

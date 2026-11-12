@@ -281,7 +281,7 @@ def render_page(entry: dict, manifest: dict) -> str:
         "",
         ("- **In RustGIS** (desktop): " if process else "- **In RustGIS** (desktop or [web](https://web.rustgis.app)): ")
         + f"open **Plugins › Plugin Manager › Browse**, find **{text(name)}** and choose **Install**. "
-        + ("RustGIS downloads the package for your platform and checks it against its SHA-256 above." if packages[0][0] else "RustGIS checks the download against the SHA-256 above.")
+        + (f"RustGIS downloads the package for your platform ({', '.join(platform for platform, _ in packages)}) and checks it against its SHA-256 above; on another platform the plugin is listed as not available." if packages[0][0] else "RustGIS checks the download against the SHA-256 above.")
         + (" It then makes the plugin's Python environment, which downloads Python and its packages the first time." if entry.get("python") and process else ""),
         f"- **On the command line:** `rustgis-cli plugins get {pid}`.",
         f"- **From the file:** download the package{' for your platform' if packages[0][0] else ''}, then choose **Plugins › Install From File** in RustGIS or run "
