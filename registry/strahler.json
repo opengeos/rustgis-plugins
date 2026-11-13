@@ -1,8 +1,8 @@
 {
   "id": "strahler",
   "source": {
-    "url": "https://github.com/arielsrossi/rustgis-strahler/releases/download/v0.2.3/strahler-0.2.3.rgplugin",
-    "sha256": "1ac52cd46ef8726dd493f710eb6d663f0755fc10443af6a9fdae966bd6a27f7e"
+    "url": "https://github.com/arielsrossi/rustgis-strahler/releases/download/v0.2.4/strahler-0.2.4.rgplugin",
+    "sha256": "13814ff79a7839865e8b015cedebd5d23b269329dfc3c50f92be99c1f0c7dcaf"
   },
   "categories": [
     "Analysis",
