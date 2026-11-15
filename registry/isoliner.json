@@ -1,0 +1,12 @@
+{
+  "id": "isoliner",
+  "source": {
+    "url": "https://github.com/Valery35/isoliner-rustgis/releases/download/rustgis-v0.1.2/isoliner-0.1.2.rgplugin",
+    "sha256": "b45a250834551ba8f330e44c39a3b068b682ae80f341e311648dfc6e9ce7c652"
+  },
+  "categories": [
+    "Analysis",
+    "Vector",
+    "Example"
+  ]
+}
