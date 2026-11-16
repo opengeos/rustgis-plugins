@@ -1,8 +1,18 @@
 {
   "id": "rustplanetx",
   "source": {
-    "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.6.1/rustplanetx-0.6.1-windows.rgplugin",
-    "sha256": "e06456e584f5a065d7505d3d714178f2662d64981a4e7161c42568e5b3d26906"
+    "windows": {
+      "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.6.2/rustplanetx-0.6.2-windows.rgplugin",
+      "sha256": "16983e7f2d6ecb9e7813ca217af1a659e9c9a7bec8c8a471e7cc29b4514d1202"
+    },
+    "linux": {
+      "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.6.2/rustplanetx-0.6.2-linux.rgplugin",
+      "sha256": "7a0ec98ea8ccd8b58c849e062477c124fc06c250ed15804e11f96672d68a2491"
+    },
+    "macos": {
+      "url": "https://github.com/Valery35/rustplanetx/releases/download/v0.6.2/rustplanetx-0.6.2-macos.rgplugin",
+      "sha256": "86d60a17820c6cb9322ada0822ebba3e25c2946cc3820bd26de5fad4acc572ec"
+    }
   },
   "categories": [
     "Visualization",
