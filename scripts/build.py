@@ -493,7 +493,7 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         problem(f"{where}: a pick needs a label or a command")
     shape = item.get("shape", "")
     if not isinstance(shape, str):
-        problem(f"{where}: a pick's shape is point or box")
+        problem(f"{where}: shape is text, a pick's point or box")
     elif kind == "pick" and shape and shape not in PICK_SHAPES:
         problem(f"{where}: a pick's shape {shape!r} isn't point or box")
     elif kind != "pick" and shape:

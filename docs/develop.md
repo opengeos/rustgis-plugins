@@ -277,9 +277,11 @@ from `plugin.json` or the plugin (at most 1,000; a `default` must be one of the 
 `plugin.json` declares, so a dropdown filled at run time sets its value from the plugin); a date
 is a box for `YYYY-MM-DD` with a
 calendar; a range is a slider with two handles, its value `[low, high]`; a pick is a button that
-asks for a place on the map, a point or, with `"shape": "box"`, a box. Its value is the point's
-`lon` and `lat` in degrees (with `x`, `y` and the map's `crs`) or the box's `bbox`
-(`[west, south, east, north]` in degrees); read it from `req.panel`.
+asks for a place on the map, a point or, with `"shape": "box"`, a box. A point's value has its
+`lon` and `lat` in degrees, a box's its `bbox` (`[west, south, east, north]` in degrees); read it
+from `req.panel`. Where the map's projection can show the place, the value also has it in the
+map's coordinates: a point's `x` and `y`, a box's `extent`, and the map's `crs`. Picks and forms
+need RustGIS 0.7.0 or later: set `minRustgisVersion` to `"0.7.0"` in a plugin whose panel has one.
 
 RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
 read them with `req.panel_bool("visible-only")`, `req.panel_i64("year")` and
