@@ -1,0 +1,11 @@
+{
+  "id": "routeliner",
+  "source": {
+    "url": "https://github.com/Valery35/routeliner-rustgis/releases/download/rustgis-v0.1.1/routeliner-0.1.1.rgplugin",
+    "sha256": "bd0cd7002ff948b6b7a2be55ce4c695ccf9c7fb0c1234876b981af951ed84b24"
+  },
+  "categories": [
+    "Vector",
+    "Analysis"
+  ]
+}
