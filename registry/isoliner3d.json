@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "isoliner3d",
   "source": {
     "url": "https://github.com/Valery35/isoliner-scene/releases/download/rustgis-v0.6.0/isoliner3d-0.6.0.rgplugin",
@@ -6,7 +6,6 @@
   },
   "categories": [
     "Analysis",
-    "Vector",
-    "3D"
+    "Vector"
   ]
 }
