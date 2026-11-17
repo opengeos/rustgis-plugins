@@ -1,0 +1,11 @@
+{
+  "id": "topoliner",
+  "source": {
+    "url": "https://github.com/Valery35/topoliner-rustgis/releases/download/rustgis-v0.1.1/topoliner-0.1.1.rgplugin",
+    "sha256": "08fe19dc556986d4f5df6057639793683dd0808d0e042bae1c0e0841d2f1fed1"
+  },
+  "categories": [
+    "Analysis",
+    "Vector"
+  ]
+}
