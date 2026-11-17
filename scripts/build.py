@@ -75,7 +75,10 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
-PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree", "choice", "date", "range"}
+# RustGIS's (crates/plugins/src/panel.rs, KINDS): a form since #1539, a pick since #1643.
+PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree", "form", "choice", "date", "range", "pick"}
+# What a pick asks for on the map: a point (when unset) or a box.
+PICK_SHAPES = {"point", "box"}
 # A dropdown's (choice's) most options, and the longest option id.
 PANEL_CHOICES = 1_000
 # The largest plugin.json RustGIS reads.
@@ -471,7 +474,7 @@ def panel_date(s: object) -> bool:
 
 def check_panel_item(item: dict, kind: str, where: str) -> None:
     """Checks a panel widget's fields: which kinds take which, a slider's or a range's ends and
-    default, a dropdown's options, a date's default and a tree's search.
+    default, a dropdown's options, a date's default, a tree's search and a pick's shape.
 
     Args:
         item: The widget, an object with a known `kind`.
@@ -486,6 +489,15 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         problem(f"{where}: a text runs no command")
     if kind == "checkbox" and not item.get("label", "").strip():
         problem(f"{where}: a checkbox needs a label")
+    if kind == "pick" and not item.get("label", "").strip() and not item.get("command"):
+        problem(f"{where}: a pick needs a label or a command")
+    shape = item.get("shape", "")
+    if not isinstance(shape, str):
+        problem(f"{where}: a pick's shape is point or box")
+    elif kind == "pick" and shape and shape not in PICK_SHAPES:
+        problem(f"{where}: a pick's shape {shape!r} isn't point or box")
+    elif kind != "pick" and shape:
+        problem(f"{where}: shape is for picks")
     if kind != "text" and item.get("text"):
         problem(f"{where}: text is for texts")
     if not isinstance(item.get("search", False), bool):
