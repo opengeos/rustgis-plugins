@@ -264,7 +264,8 @@ way.
     { "kind": "tree", "id": "catalogue", "label": "Catalogue", "search": true, "command": "show" },
     { "kind": "choice", "id": "theme", "label": "Theme", "options": [{ "id": "env", "label": "Environment" }], "default": "env" },
     { "kind": "date", "id": "start", "label": "Start date", "default": "2024-01-01" },
-    { "kind": "range", "id": "years", "label": "Years", "min": 2000, "max": 2025, "default": [2010, 2020] }
+    { "kind": "range", "id": "years", "label": "Years", "min": 2000, "max": 2025, "default": [2010, 2020] },
+    { "kind": "pick", "id": "place", "label": "Click on the map", "command": "show" }
   ]
 }
 ```
@@ -275,7 +276,12 @@ pane's: the plugin only hears of the node the user chooses. A dropdown (`choice`
 from `plugin.json` or the plugin (at most 1,000; a `default` must be one of the options
 `plugin.json` declares, so a dropdown filled at run time sets its value from the plugin); a date
 is a box for `YYYY-MM-DD` with a
-calendar; a range is a slider with two handles, its value `[low, high]`.
+calendar; a range is a slider with two handles, its value `[low, high]`; a pick is a button that
+asks for a place on the map, a point or, with `"shape": "box"`, a box. A point's value has its
+`lon` and `lat` in degrees, a box's its `bbox` (`[west, south, east, north]` in degrees); read it
+from `req.panel`. Where the map's projection can show the place, the value also has it in the
+map's coordinates: a point's `x` and `y`, a box's `extent`, and the map's `crs`. Picks and forms
+need RustGIS 0.7.0 or later: set `minRustgisVersion` to `"0.7.0"` in a plugin whose panel has one.
 
 RustGIS keeps the widgets' values, and every request of the plugin carries them. With the SDK,
 read them with `req.panel_bool("visible-only")`, `req.panel_i64("year")` and
