@@ -1,0 +1,11 @@
+{
+  "id": "quick-field-keys",
+  "source": {
+    "url": "https://github.com/HaYanJongSeong/rustgis-quick-field-keys/releases/download/v0.1.0/quick-field-keys-0.1.0.rgplugin",
+    "sha256": "b20c22e05fc690f46eeb61d49ec322b1767933a5a4b832e8c5884e9e4ce27046"
+  },
+  "categories": [
+    "Editing",
+    "Vector"
+  ]
+}
