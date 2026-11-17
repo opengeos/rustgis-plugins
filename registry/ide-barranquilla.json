@@ -1,0 +1,13 @@
+{
+  "id": "ide-barranquilla",
+  "source": {
+    "url": "https://github.com/jgregoriorincon/rustgis-ide-barranquilla/releases/download/ide-barranquilla-v0.1.1/ide-barranquilla-0.1.1.rgplugin",
+    "sha256": "7f30e8b3c076908d2110e4f2ff06915165c05f9b7a4b16471fccd5598fa32883"
+  },
+  "categories": [
+    "Basemaps",
+    "Cartography",
+    "Data",
+    "Vector"
+  ]
+}

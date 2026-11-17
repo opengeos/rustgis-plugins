@@ -1,0 +1,11 @@
+{
+  "id": "passagens",
+  "source": {
+    "url": "https://github.com/elpidioassinaturas/rustgis-passagens/releases/download/v0.5.3/passagens-0.5.3.rgplugin",
+    "sha256": "37c36b7734dada2590f468bfba98e3e8d0b22daad9a00fa40c085d86db39d75a"
+  },
+  "categories": [
+    "Imagery",
+    "Data"
+  ]
+}

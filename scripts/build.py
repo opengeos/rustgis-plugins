@@ -13,12 +13,16 @@ Each plugin has an entry in registry/<id>.json:
   "sha256": "..."}}; it is downloaded and checked against the hash. A process plugin
   ("runtime": "process", a program such as a Python script, not sandboxed) is listed this way
   only: its package holds its files, which are checked in place of a module.
+- a process plugin that ships a program for each platform can name one package per platform:
+  {"id": ..., "source": {"windows": {"url": ..., "sha256": ...}, "macos": {...}, "linux": {...}}}.
+  Each is downloaded and checked like any other; they must be the same plugin (one plugin.json,
+  but for `run`), and RustGIS downloads the one for the platform it runs on.
 - the plugins in LEGACY_PATHS still name their folder here, {"id": ..., "path": "plugins/<dir>"},
   and are built from source with cargo, until they move to a repository of their own. No other
   plugin may: plugin source belongs in its own repository, and only registry entries here.
 
 Packages are served from packages.rustgis.app (a Cloudflare R2 bucket) at <id>/<id>-<version>.rgplugin
-and never change once published. So the build is incremental: the previous deploy's package
+(<id>/<id>-<version>-<platform>.rgplugin for a package per platform) and never change once published. So the build is incremental: the previous deploy's package
 index (plugins.rustgis.app/packages.json) says what is published, and only plugins whose version
 (or source) changed are built or downloaded. An in-repository plugin whose files changed without
 a version bump is a problem. Without the index, packages already in the bucket are reused rather
@@ -71,7 +75,15 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,2}([-+][0-9A-Za-z]+(\.[0-9A-Za-z]+)*)*$"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 PERMISSIONS = {"edit", "files", "network"}
 PARAM_KINDS = {"layer", "vectorLayer", "polygonLayer", "pointLayer", "field", "numericField", "number", "text", "choice", "bool", "file"}
-PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree"}
+# RustGIS's (crates/plugins/src/panel.rs, KINDS): a form since #1539, a pick since #1643.
+PANEL_KINDS = {"text", "checkbox", "slider", "button", "tree", "form", "choice", "date", "range", "pick"}
+# What a pick asks for on the map: a point (when unset) or a box.
+PICK_SHAPES = {"point", "box"}
+# A dropdown's (choice's) most options, and the longest option id.
+PANEL_CHOICES = 1_000
+# The largest plugin.json RustGIS reads.
+MANIFEST_MAX = 512 * 1024
+PANEL_OPTION_ID = 200
 # RustGIS's panel limits (crates/plugins/src/panel.rs).
 PANEL_TITLE = 48
 PANEL_DECLARED = 2_000
@@ -88,6 +100,8 @@ MAX_UNPACKED = 1024 * 1024 * 1024
 MAX_RUN_ARGS = 64
 MAX_TEXT = 2000
 RUN_PLATFORMS = ("windows", "macos", "linux", "default")
+# The platforms an entry can name a package for (RustGIS's registry.rs PLATFORMS).
+PACKAGE_PLATFORMS = ("windows", "macos", "linux")
 PYTHON_VERSION_RE = re.compile(r"3\.\d{1,3}(\.\d{1,3})?", re.ASCII)
 # The programs RustGIS swaps for the plugin's own environment's interpreter.
 PYTHONS = {"python", "python3", "python.exe"}
@@ -421,11 +435,11 @@ def check_panel(m: dict, where: str) -> None:
             problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
             continue
         command = item.get("command")
-        if (kind == "button" or command is not None) and not (isinstance(command, str) and command in commands):
+        if (kind == "button" or command is not None) and not (isinstance(command, str) and (command in commands or (kind == "form" and command == ""))):
             problem(f"{where}: panel {kind} {item.get('id', command)!r} runs {command!r}, which isn't one of the plugin's commands")
             continue
         widget = item.get("id", command if kind == "button" else None)
-        if not isinstance(widget, str) or not ID_RE.match(widget):
+        if not isinstance(widget, str) or not (ID_RE.fullmatch(widget) if kind == "form" else ID_RE.match(widget)):
             problem(f"{where}: panel {kind} {widget!r} needs a valid id")
         elif widget in seen:
             problem(f"{where}: two panel widgets have the id {widget!r} (a button's id is its command's unless it has one of its own)")
@@ -445,9 +459,22 @@ def whole(v: object) -> int | None:
     return None
 
 
+def panel_date(s: object) -> bool:
+    """Whether `s` is a real date written YYYY-MM-DD (years 1 to 9999), as RustGIS reads one."""
+    # ASCII digits only: `\d` would take other scripts' digits, which RustGIS refuses.
+    if not isinstance(s, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", s):
+        return False
+    y, m, d = int(s[:4]), int(s[5:7]), int(s[8:])
+    if y < 1 or not 1 <= m <= 12:
+        return False
+    leap = (y % 4 == 0 and y % 100 != 0) or y % 400 == 0
+    days = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]
+    return 1 <= d <= days
+
+
 def check_panel_item(item: dict, kind: str, where: str) -> None:
-    """Checks a panel widget's fields: which kinds take which, a slider's range and default, and a
-    tree's search.
+    """Checks a panel widget's fields: which kinds take which, a slider's or a range's ends and
+    default, a dropdown's options, a date's default, a tree's search and a pick's shape.
 
     Args:
         item: The widget, an object with a known `kind`.
@@ -458,36 +485,92 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         if not isinstance(item.get(key, ""), str) or len(item.get(key, "")) > PANEL_DECLARED:
             problem(f"{where}: {key} must be text of at most {PANEL_DECLARED} characters")
             return
+    if kind == "form" and (not isinstance(item.get("shape", ""), str) or item.get("shape", "")):
+        problem(f"{where}: shape is for picks")
+    if kind == "form":
+        # Forms declare no static fields or defaults; fields arrive in command replies.
+        if "command" in item and not isinstance(item["command"], str):
+            problem(f"{where}: command must be text")
+        for key in ("min", "max"):
+            if type(item.get(key, 0)) is not int or item.get(key, 0) != 0:
+                problem(f"{where}: {key} must be zero for a form")
+        for key in ("steps", "search"):
+            if item.get(key, False) is not False:
+                problem(f"{where}: {key} must be false for a form")
+        if item.get("options", []) != [] or not isinstance(item.get("options", []), list):
+            problem(f"{where}: options are for dropdowns (choice)")
+        if item.get("default") is not None:
+            problem(f"{where}: a form has no declared default")
+        if item.get("text", ""):
+            problem(f"{where}: text is for texts")
+        return
     if kind == "text" and item.get("command"):
         problem(f"{where}: a text runs no command")
     if kind == "checkbox" and not item.get("label", "").strip():
         problem(f"{where}: a checkbox needs a label")
+    if kind == "pick" and not item.get("label", "").strip() and not item.get("command"):
+        problem(f"{where}: a pick needs a label or a command")
+    shape = item.get("shape", "")
+    if not isinstance(shape, str):
+        problem(f"{where}: shape is text, a pick's point or box")
+    elif kind == "pick" and shape and shape not in PICK_SHAPES:
+        problem(f"{where}: a pick's shape {shape!r} isn't point or box")
+    elif kind != "pick" and shape:
+        problem(f"{where}: shape is for picks")
     if kind != "text" and item.get("text"):
         problem(f"{where}: text is for texts")
     if not isinstance(item.get("search", False), bool):
         problem(f"{where}: search is true or false")
     elif kind != "tree" and item.get("search", False):
         problem(f"{where}: search is for trees")
+    options = item.get("options", [])
+    if kind != "choice" and "options" in item:
+        problem(f"{where}: options are for dropdowns (choice)")
+    ids: list[str] = []
+    if kind == "choice":
+        if not isinstance(options, list) or len(options) > PANEL_CHOICES:
+            problem(f"{where}: a dropdown's options are a list of at most {PANEL_CHOICES:,}")
+            return
+        for o in options:
+            oid = o.get("id") if isinstance(o, dict) else None
+            if not isinstance(oid, str) or not 1 <= len(oid) <= PANEL_OPTION_ID or oid in ids:
+                problem(f"{where}: each option is an object with a unique id of 1 to {PANEL_OPTION_ID} characters")
+                return
+            if not isinstance(o.get("label", ""), (str, type(None))):
+                problem(f"{where}: an option's label is text")
+            ids.append(oid)
     lo, hi = item.get("min", 0), item.get("max", 0)
-    if kind != "slider":
+    if kind not in ("slider", "range"):
         if lo != 0 or hi != 0 or item.get("steps", False):
-            problem(f"{where}: min, max and steps are for sliders")
-        if "default" in item and kind != "checkbox":
-            problem(f"{where}: only checkboxes and sliders have a default")
-        elif kind == "checkbox" and "default" in item and not isinstance(item["default"], bool):
+            problem(f"{where}: min, max and steps are for sliders and ranges")
+        if "default" not in item:
+            return
+        default = item["default"]
+        if kind == "checkbox" and not isinstance(default, bool):
             problem(f"{where}: a checkbox's default is true or false")
+        elif kind == "choice" and default not in ids:
+            problem(f"{where}: a dropdown's default is the id of one of its options")
+        elif kind == "date" and not panel_date(default):
+            problem(f"{where}: a date's default is a date written YYYY-MM-DD")
+        elif kind not in ("checkbox", "choice", "date"):
+            problem(f"{where}: only checkboxes, sliders, ranges, dropdowns and dates have a default")
         return
     if not isinstance(item.get("steps", False), bool):
         problem(f"{where}: steps is true or false")
     if isinstance(lo, bool) or isinstance(hi, bool) or not isinstance(lo, int) or not isinstance(hi, int):
-        problem(f"{where}: a slider's min and max are whole numbers")
+        problem(f"{where}: a slider's or a range's min and max are whole numbers")
         return
     if lo > hi or lo < -SLIDER_LIMIT or hi > SLIDER_LIMIT:
-        problem(f"{where}: a slider's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
-    if "default" in item:
+        problem(f"{where}: a slider's or a range's min must not be above its max, both within ±{SLIDER_LIMIT:,}")
+    if "default" in item and kind == "slider":
         v = whole(item["default"])
         if v is None or not lo <= v <= hi:
             problem(f"{where}: a slider's default is a whole number from min to max")
+    elif "default" in item:
+        d = item["default"]
+        pair = [whole(v) for v in d] if isinstance(d, list) and len(d) == 2 else None
+        if pair is None or None in pair or not lo <= pair[0] <= pair[1] <= hi:
+            problem(f"{where}: a range's default is [low, high], whole numbers from min to max, low first")
 
 
 def check_module(wasm: bytes, where: str) -> None:
@@ -529,6 +612,10 @@ def read_package(data: bytes, where: str) -> tuple[dict, bytes] | None:
             root = "" if "plugin.json" in names else next((n[: -len("plugin.json")] for n in names if n.endswith("/plugin.json")), None)
             if root is None:
                 problem(f"{where}: the package has no plugin.json")
+                return None
+            # RustGIS reads at most 512 KiB of plugin.json (a dropdown's options can grow it).
+            if z.getinfo(root + "plugin.json").file_size > MANIFEST_MAX:
+                problem(f"{where}: plugin.json is larger than {MANIFEST_MAX // 1024} KiB, which RustGIS refuses")
                 return None
             manifest = json.loads(z.read(root + "plugin.json"))
             # A process plugin has no module: its files are checked by check_process().
@@ -683,6 +770,34 @@ def check_process(data: bytes, m: dict, where: str) -> None:
         problem(f"{where}: the plugin declares a Python environment but 'run' doesn't start python, its interpreter")
 
 
+def package_file(pid: str, version: str, platform: str | None = None) -> str:
+    """A package's file name in the bucket.
+
+    Args:
+        pid: The plugin's id.
+        version: Its version.
+        platform: The platform the package is for, or None for a plugin's only package.
+
+    Returns:
+        `<id>-<version>.rgplugin`, or `<id>-<version>-<platform>.rgplugin`.
+    """
+    return f"{pid}-{version}-{platform}.rgplugin" if platform else f"{pid}-{version}.rgplugin"
+
+
+def runs_on(manifest: dict, platform: str) -> bool:
+    """Whether a process plugin's `run` gives a program for a platform.
+
+    Args:
+        manifest: The package's plugin.json.
+        platform: One of PACKAGE_PLATFORMS.
+
+    Returns:
+        True when `run` is one program for every platform, or names this one (or `default`).
+    """
+    run = manifest.get("run")
+    return isinstance(run, list) or (isinstance(run, dict) and bool(run.get(platform) or run.get("default")))
+
+
 def package_name(folder: Path) -> str:
     """The cargo package name of an in-repository plugin (for `cargo build -p`)."""
     return tomllib.loads((folder / "Cargo.toml").read_text())["package"]["name"]
@@ -786,11 +901,20 @@ def valid_cached(p: object) -> bool:
     if not isinstance(p, dict):
         return False
     m = p.get("manifest")
+
+    def package(v: object) -> bool:
+        return isinstance(v, dict) and SHA_RE.match(str(v.get("sha256", ""))) is not None and isinstance(v.get("size"), int)
+
+    # One package, or one per platform.
+    platforms = p.get("platforms")
+    if platforms is None:
+        packaged = package(p)
+    else:
+        packaged = isinstance(platforms, dict) and bool(platforms) and set(platforms) <= set(PACKAGE_PLATFORMS) and all(map(package, platforms.values()))
     return (
         isinstance(p.get("id"), str)
         and isinstance(p.get("version"), str)
-        and SHA_RE.match(str(p.get("sha256", ""))) is not None
-        and isinstance(p.get("size"), int)
+        and packaged
         and isinstance(p.get("origin"), dict)
         and isinstance(m, dict)
         and m.get("id") == p["id"]
@@ -905,6 +1029,84 @@ def unpack_for_review(data: bytes, dest: Path) -> list[str]:
     return lines
 
 
+def inspect_package(rid: str, platform: str | None, src: dict, out: Path, known: list[str], rows: list[str], notes: list[str]) -> None:
+    """Inspects one package a registry entry points at (see `inspect`).
+
+    Args:
+        rid: The entry's plugin id.
+        platform: The platform the package is for, or None for the plugin's only package.
+        src: The package's `url` and `sha256`.
+        out: The folder the review reads.
+        known: RustGIS's command ids.
+        rows: The report's table rows, added to.
+        notes: The report's notes, added to.
+    """
+    # Named with its platform in the report; unpacked beside the other platforms' packages.
+    pid = f"{rid} ({platform})" if platform else rid
+    try:
+        data = download(str(src.get("url", "")))
+    except Exception as e:  # noqa: BLE001 - reported as a finding
+        notes.append(f"- `{pid}`: could not be downloaded ({e}); not inspected")
+        return
+    got = sha256(data)
+    if got != src.get("sha256"):
+        notes.append(f"- `{pid}`: SHA-256 mismatch (registry {src.get('sha256')}, download {got}); not inspected")
+        return
+    read = read_package(data, pid)
+    if read is None:
+        notes.append(f"- `{pid}`: not a readable package; not inspected")
+        return
+    manifest, wasm = read
+    dest = out / "plugins" / rid / platform if platform else out / "plugins" / rid
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "plugin.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        names = z.namelist()
+        readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
+        if readme:
+            (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
+    # The manifest's text goes into a table: one line, no cell breaks.
+    version = cell(manifest.get("version"))
+    listed = manifest.get("permissions", [])
+    perms = cell(", ".join(map(str, listed)) or "none") if isinstance(listed, list) else f"not a list: {cell(json.dumps(listed))}"
+    if manifest.get("runtime") == "process":
+        # Not sandboxed, and its code is readable: unpack it for review.
+        listing = unpack_for_review(data, dest / "files")
+        (dest / "files.txt").write_text("\n".join(listing) + "\n")
+        py = manifest.get("python")
+        runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
+        run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
+        rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {sum(not n.endswith("/") for n in names):,} files | {perms} | runs `{run}` | n/a: read its code |")
+        return
+    try:
+        exports, imports = wasm_interface(wasm)
+    except (ValueError, IndexError) as e:
+        exports, imports = set(), [f"unreadable: {e}"]
+    try:
+        commands, urls, n_urls = module_strings(wasm, known)
+        named = ", ".join(commands) or "none"
+        listed = ", ".join(f"`{c}`" for c in commands) or "none"
+        if not known:
+            named = listed = f"unknown: the command list {COMMANDS.name} is missing or empty"
+    except (ValueError, IndexError) as e:
+        urls, n_urls = [], 0
+        named = f"(the module's strings could not be read: {e})"
+        listed = "**strings unreadable**"
+        notes.append(f"- `{pid}`: the module's strings could not be read ({e}), so the commands and URLs it names are unknown")
+    if n_urls > len(urls):
+        urls.append(f"({n_urls - len(urls)} more not shown)")
+    # The module itself, for the workflow to disassemble (wasm2wat) when it is small enough.
+    (dest / "module.wasm").write_bytes(wasm)
+    (dest / "module.txt").write_text(
+        "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
+        + "commands named in strings (not those built at run time): " + named + "\n"
+        + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
+    )
+    rows.append(
+        f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} | {listed} |"
+    )
+
+
 def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     """For code review: downloads the package each changed registry entry with a `source` points
     at, checks its SHA-256, and writes what it holds to <out>/plugins/<id>/ (plugin.json, README,
@@ -920,75 +1122,28 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
         except (OSError, json.JSONDecodeError) as e:
             notes.append(f"- `{f}`: unreadable ({e})")
             continue
-        src = reg.get("source")
-        if not isinstance(src, dict):
+        source = reg.get("source")
+        if not isinstance(source, dict):
             continue
-        pid = str(reg.get("id", ""))
-        if not ID_RE.match(pid):
+        rid = str(reg.get("id", ""))
+        if not ID_RE.match(rid):
             notes.append(f"- `{f}`: invalid id, not inspected")
             continue
-        try:
-            data = download(str(src.get("url", "")))
-        except Exception as e:  # noqa: BLE001 - reported as a finding
-            notes.append(f"- `{pid}`: could not be downloaded ({e}); not inspected")
-            continue
-        got = sha256(data)
-        if got != src.get("sha256"):
-            notes.append(f"- `{pid}`: SHA-256 mismatch (registry {src.get('sha256')}, download {got}); not inspected")
-            continue
-        read = read_package(data, pid)
-        if read is None:
-            notes.append(f"- `{pid}`: not a readable package; not inspected")
-            continue
-        manifest, wasm = read
-        dest = out / "plugins" / pid
-        dest.mkdir(parents=True, exist_ok=True)
-        (dest / "plugin.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
-        with zipfile.ZipFile(io.BytesIO(data)) as z:
-            names = z.namelist()
-            readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
-            if readme:
-                (dest / "README.md").write_bytes(z.read(readme)[:512 * 1024])
-        # The manifest's text goes into a table: one line, no cell breaks.
-        version = cell(manifest.get("version"))
-        listed = manifest.get("permissions", [])
-        perms = cell(", ".join(map(str, listed)) or "none") if isinstance(listed, list) else f"not a list: {cell(json.dumps(listed))}"
-        if manifest.get("runtime") == "process":
-            # Not sandboxed, and its code is readable: unpack it for review.
-            listing = unpack_for_review(data, dest / "files")
-            (dest / "files.txt").write_text("\n".join(listing) + "\n")
-            py = manifest.get("python")
-            runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
-            run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
-            rows.append(f"| `{pid}` | {version} | {runtime} | {len(data):,} B | {sum(not n.endswith("/") for n in names):,} files | {perms} | runs `{run}` | n/a: read its code |")
-            continue
-        try:
-            exports, imports = wasm_interface(wasm)
-        except (ValueError, IndexError) as e:
-            exports, imports = set(), [f"unreadable: {e}"]
-        try:
-            commands, urls, n_urls = module_strings(wasm, known)
-            named = ", ".join(commands) or "none"
-            listed = ", ".join(f"`{c}`" for c in commands) or "none"
-            if not known:
-                named = listed = f"unknown: the command list {COMMANDS.name} is missing or empty"
-        except (ValueError, IndexError) as e:
-            urls, n_urls = [], 0
-            named = f"(the module's strings could not be read: {e})"
-            listed = "**strings unreadable**"
-            notes.append(f"- `{pid}`: the module's strings could not be read ({e}), so the commands and URLs it names are unknown")
-        if n_urls > len(urls):
-            urls.append(f"({n_urls - len(urls)} more not shown)")
-        # The module itself, for the workflow to disassemble (wasm2wat) when it is small enough.
-        (dest / "module.wasm").write_bytes(wasm)
-        (dest / "module.txt").write_text(
-            "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
-            + "commands named in strings (not those built at run time): " + named + "\n"
-            + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
-        )
-        rows.append(
-            f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} | {listed} |"
-        )
+        # One package, or one per platform: each is a program of its own to read. Anything the
+        # review isn't shown is said.
+        if "url" in source or "sha256" in source:
+            sources = [(None, source)]
+            if extra := sorted(set(source) - {"url", "sha256"}):
+                notes.append(f"- `{rid}`: source has a package of its own and also '{cell(extra[0])}': a source is one package or packages by platform; only the one package was inspected")
+        elif not source:
+            sources = []
+            notes.append(f"- `{rid}`: source names no package; nothing inspected")
+        else:
+            sources = [(k, v) for k, v in sorted(source.items()) if k in PACKAGE_PLATFORMS and isinstance(v, dict)]
+            for k in sorted(set(source) - {k for k, _ in sources}):
+                notes.append(f"- `{rid}`: source.{cell(str(k))} isn't a platform's package ({', '.join(PACKAGE_PLATFORMS)}, each with a url and sha256); not inspected")
+        for platform, src in sources:
+            inspect_package(rid, platform, src, out, known, rows, notes)
     report = ["# Packages this PR points at", ""]
     if rows:
         report += [
@@ -1001,6 +1156,86 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     (out / "report.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))
     return 0
+
+
+def obtain(reg: dict, where: str, how: str, what: object, platform: str | None, args: argparse.Namespace) -> tuple | None:
+    """Builds or downloads one package of a registry entry and checks it.
+
+    Args:
+        reg: The registry entry.
+        where: Where it is, for messages.
+        how: "build" (from the folder `what`) or "download" (from the source `what`).
+        what: The plugin's folder, or the package's `url` and `sha256`.
+        platform: The platform the package is for, or None for the plugin's only package.
+        args: The command line's options.
+
+    Returns:
+        The package's manifest, SHA-256, size and, when it isn't in the bucket yet, its bytes
+        (None when it is); or None when it has a problem, which is reported.
+    """
+    if how == "build":
+        wasm_path = TARGET / f"{crate_name(what)}.wasm"
+        if not wasm_path.is_file():
+            problem(f"{where}: {wasm_path.relative_to(ROOT)} wasn't built")
+            return None
+        data = package(what / "plugin.json", wasm_path.read_bytes())
+    else:
+        try:
+            data = download(str(what.get("url", "")))
+        except Exception as e:  # noqa: BLE001 - any download failure is a registry problem
+            problem(f"{where}: can't download {what.get('url')}: {e}")
+            return None
+        if sha256(data) != what["sha256"]:
+            problem(f"{where}: {what.get('url')} doesn't match source.sha256 (it is {sha256(data)})")
+            return None
+    read = read_package(data, where)
+    if read is None:
+        return None
+    manifest, wasm = read
+    check_manifest(manifest, where)
+    check_tab(manifest, where)
+    check_panel(manifest, where)
+    if manifest.get("runtime") == "process":
+        check_process(data, manifest, where)
+    else:
+        check_module(wasm, where)
+    if manifest.get("id") != reg["id"]:
+        problem(f"{where}: the package's id is '{manifest.get('id')}'")
+        return None
+    if platform is not None:
+        # A module is the same on every platform; a program isn't.
+        if manifest.get("runtime") != "process":
+            problem(f"{where}: a package per platform is for process plugins; a WebAssembly plugin has one package, listed by 'source.url'")
+            return None
+        if not runs_on(manifest, platform):
+            problem(f"{where}: the package's 'run' has no program for {platform}")
+            return None
+    # A version already in the bucket is never replaced: reuse it (a rebuild needn't be
+    # byte-identical), unless it's a different plugin under that name.
+    url = f"{PACKAGES_URL}/{manifest['id']}/{package_file(manifest['id'], manifest['version'], platform)}"
+    try:
+        existing = None if args.no_bucket else published(url)
+    except Exception as e:  # noqa: BLE001 - reported like the other downloads
+        problem(f"{where}: can't check {url}: {e}")
+        return None
+    if existing is not None and how == "download" and sha256(existing) != sha256(data):
+        problem(f"{where}: {manifest['id']} {manifest['version']} is already published with different contents; bump the version")
+        return None
+    if existing is not None and how == "build":
+        # A rebuild needn't be byte-identical, but what it declares must match what is
+        # published under this version: otherwise the version wasn't bumped.
+        old = read_package(existing, f"{url} (published)")
+        if old is None or old[0] != manifest:
+            problem(f"{where}: plugin.json differs from the published {manifest['id']} {manifest['version']}; bump the version")
+            return None
+        if old[1] != wasm:
+            print(
+                f"warning: {where}: the rebuilt module differs from the published {manifest['id']} {manifest['version']}"
+                " (a different toolchain, or code changed without a version bump); the published one is kept",
+                file=sys.stderr,
+            )
+    data = existing if existing is not None else data
+    return manifest, sha256(data), len(data), data if existing is None else None
 
 
 def main() -> int:
@@ -1070,9 +1305,24 @@ def main() -> int:
                 plans.append((reg, where, "reuse", cached, origin))
             else:
                 plans.append((reg, where, "build", folder, origin))
+        elif isinstance(reg.get("source"), dict) and reg["source"] and not {"url", "sha256"} & set(reg["source"]):
+            # A package per platform.
+            srcs = reg["source"]
+            if unknown := sorted(set(srcs) - set(PACKAGE_PLATFORMS)):
+                problem(f"{where}: source.{unknown[0]} isn't a platform: a package per platform is listed under {', '.join(PACKAGE_PLATFORMS)}")
+                continue
+            if bad := [k for k in sorted(srcs) if not isinstance(srcs[k], dict) or not SHA_RE.match(str(srcs[k].get("sha256", "")))]:
+                problem(f"{where}: source.{bad[0]}.sha256 must be the package's lower-case hex SHA-256")
+                continue
+            origin = {"platforms": {k: {"source": str(srcs[k].get("url", "")), "sha256": srcs[k]["sha256"]} for k in sorted(srcs)}}
+            was = cached.get("origin", {}).get("platforms") if cached else None
+            if isinstance(was, dict) and {k: v.get("sha256") for k, v in was.items() if isinstance(v, dict)} == {k: v["sha256"] for k, v in origin["platforms"].items()}:
+                plans.append((reg, where, "reuse", cached, origin))
+            else:
+                plans.append((reg, where, "platforms", srcs, origin))
         elif "source" in reg:
             src = reg["source"]
-            if not SHA_RE.match(src.get("sha256", "")):
+            if not isinstance(src, dict) or not SHA_RE.match(str(src.get("sha256", ""))):
                 problem(f"{where}: source.sha256 must be the package's lower-case hex SHA-256")
                 continue
             origin = {"source": src.get("url", ""), "sha256": src["sha256"]}
@@ -1093,75 +1343,63 @@ def main() -> int:
 
     entries, packages, new = [], [], []
     for reg, where, how, what, origin in plans:
+        # The plugin's packages: its only one (under None), or one per platform. Each is its
+        # hash, its size and, when this run made or downloaded it, its bytes.
+        parts: dict = {}
         if how == "reuse":
-            manifest, digest, size, fresh = what["manifest"], what["sha256"], what["size"], None
+            manifest = what["manifest"]
+            if "platforms" in what:
+                parts = {k: (v["sha256"], v["size"], None) for k, v in sorted(what["platforms"].items())}
+            else:
+                parts = {None: (what["sha256"], what["size"], None)}
             # Rules added since it was published apply to it too.
             check_manifest(manifest, where)
             check_tab(manifest, where)
             check_panel(manifest, where)
+        elif how == "platforms":
+            got = {k: obtain(reg, f"{where} ({k})", "download", what[k], k, args) for k in sorted(what)}
+            if any(v is None for v in got.values()):
+                continue
+            # One plugin, whatever the platform: what users are shown before installing (name,
+            # version, permissions, commands) is the same in each package. Only `run` differs.
+            first = next(iter(got))
+            manifest = got[first][0]
+            same = True
+            for k, v in got.items():
+                # A field one package has and another lacks differs too, whatever its value.
+                differ = sorted(f for f in set(manifest) | set(v[0]) if f != "run" and ((f in manifest) != (f in v[0]) or manifest.get(f) != v[0].get(f)))
+                if differ:
+                    problem(f"{where}: the {k} package's plugin.json differs from the {first} one in '{differ[0]}': the packages of a plugin differ only in 'run'")
+                    same = False
+            if not same:
+                continue
+            parts = {k: v[1:] for k, v in got.items()}
         else:
-            if how == "build":
-                wasm_path = TARGET / f"{crate_name(what)}.wasm"
-                if not wasm_path.is_file():
-                    problem(f"{where}: {wasm_path.relative_to(ROOT)} wasn't built")
-                    continue
-                data = package(what / "plugin.json", wasm_path.read_bytes())
-            else:
-                try:
-                    data = download(what.get("url", ""))
-                except Exception as e:  # noqa: BLE001 - any download failure is a registry problem
-                    problem(f"{where}: can't download {what.get('url')}: {e}")
-                    continue
-                if sha256(data) != what["sha256"]:
-                    problem(f"{where}: {what['url']} doesn't match source.sha256 (it is {sha256(data)})")
-                    continue
-            read = read_package(data, where)
-            if read is None:
+            one = obtain(reg, where, how, what, None, args)
+            if one is None:
                 continue
-            manifest, wasm = read
-            check_manifest(manifest, where)
-            check_tab(manifest, where)
-            check_panel(manifest, where)
-            if manifest.get("runtime") == "process":
-                check_process(data, manifest, where)
-            else:
-                check_module(wasm, where)
-            if manifest.get("id") != reg["id"]:
-                problem(f"{where}: the package's id is '{manifest.get('id')}'")
-                continue
-            # A version already in the bucket is never replaced: reuse it (a rebuild needn't be
-            # byte-identical), unless it's a different plugin under that name.
-            url = f"{PACKAGES_URL}/{manifest['id']}/{manifest['id']}-{manifest['version']}.rgplugin"
-            try:
-                existing = None if args.no_bucket else published(url)
-            except Exception as e:  # noqa: BLE001 - reported like the other downloads
-                problem(f"{where}: can't check {url}: {e}")
-                continue
-            if existing is not None and how == "download" and sha256(existing) != sha256(data):
-                problem(f"{where}: {manifest['id']} {manifest['version']} is already published with different contents; bump the version")
-                continue
-            if existing is not None and how == "build":
-                # A rebuild needn't be byte-identical, but what it declares must match what is
-                # published under this version: otherwise the version wasn't bumped.
-                old = read_package(existing, f"{url} (published)")
-                if old is None or old[0] != manifest:
-                    problem(f"{where}: plugin.json differs from the published {manifest['id']} {manifest['version']}; bump the version")
-                    continue
-                if old[1] != wasm:
-                    print(
-                        f"warning: {where}: the rebuilt module differs from the published {manifest['id']} {manifest['version']}"
-                        " (a different toolchain, or code changed without a version bump); the published one is kept",
-                        file=sys.stderr,
-                    )
-            data = existing if existing is not None else data
-            digest, size, fresh = sha256(data), len(data), data if existing is None else None
-        name = f"{manifest['id']}-{manifest['version']}.rgplugin"
-        if fresh is not None:
-            out = DIST / "packages" / manifest["id"] / name
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(fresh)
-            new.append(f"{manifest['id']}/{name}")
-        packages.append({"id": manifest["id"], "version": manifest["version"], "sha256": digest, "size": size, "origin": origin, "manifest": manifest})
+            manifest = one[0]
+            parts = {None: one[1:]}
+        for platform, (_, _, fresh) in parts.items():
+            if fresh is not None:
+                name = package_file(manifest["id"], manifest["version"], platform)
+                out = DIST / "packages" / manifest["id"] / name
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(fresh)
+                new.append(f"{manifest['id']}/{name}")
+
+        def listed(platform: str | None, part: tuple, manifest: dict = manifest) -> dict:
+            return {"package": f"{PACKAGES_URL}/{manifest['id']}/{package_file(manifest['id'], manifest['version'], platform)}", "sha256": part[0], "size": part[1]}
+
+        indexed = {"id": manifest["id"], "version": manifest["version"]}
+        if None in parts:
+            indexed |= {"sha256": parts[None][0], "size": parts[None][1]}
+            where_from = listed(None, parts[None])
+        else:
+            indexed["platforms"] = {k: {"sha256": v[0], "size": v[1]} for k, v in parts.items()}
+            # RustGIS downloads the one for its platform (and an older RustGIS skips the entry).
+            where_from = {"packages": {k: listed(k, v) for k, v in parts.items()}}
+        packages.append(indexed | {"origin": origin, "manifest": manifest})
         # scripts/preview.py's entry_for() makes the same entry from a manifest (CI checks they agree).
         entries.append(
             {
@@ -1173,9 +1411,7 @@ def main() -> int:
                 "homepage": manifest.get("homepage", ""),
                 "license": manifest.get("license", ""),
                 "categories": reg.get("categories", []),
-                "package": f"{PACKAGES_URL}/{manifest['id']}/{name}",
-                "sha256": digest,
-                "size": size,
+                **where_from,
                 "minRustgisVersion": manifest.get("minRustgisVersion", ""),
                 "permissions": manifest.get("permissions", []),
                 "commands": [c.get("label", "").replace("\n", " ") for c in manifest.get("commands", [])],
@@ -1185,14 +1421,15 @@ def main() -> int:
                 **runtime_fields(manifest),
             }
         )
-    print(f"{len(new)} new packages, {len(entries) - len(new)} already published")
+    print(f"{len(new)} new packages, {sum(len(p.get('platforms', [0])) for p in packages) - len(new)} already published")
 
     blocklist = json.loads((ROOT / "blocklist.json").read_text())
     for b in blocklist.get("blocked", []):
         if not ID_RE.match(b.get("id", "")) or ("sha256" in b and not SHA_RE.match(b["sha256"])):
             problem(f"blocklist.json: bad entry {b}")
         listed = next((e for e in entries if e["id"] == b.get("id")), None)
-        if listed and ("sha256" not in b or b["sha256"] == listed["sha256"]):
+        hashes = {listed.get("sha256"), *(v["sha256"] for v in listed.get("packages", {}).values())} if listed else set()
+        if listed and ("sha256" not in b or b["sha256"] in hashes):
             problem(f"blocklist.json: {b['id']} is blocked but still listed in registry/")
 
     entries.sort(key=lambda e: e["name"].lower())

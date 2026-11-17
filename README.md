@@ -62,7 +62,7 @@ Every plugin is listed by `source`, from a release of its own repository; `build
 
 - **Two hosts:**
   - `plugins.rustgis.app` (GitHub Pages; the `CNAME` file, with DNS a CNAME to `opengeos.github.io`) serves the site, `registry.json`, `blocklist.json` and `packages.json`.
-  - `packages.rustgis.app` serves the packages from the `rustgis-plugins` Cloudflare R2 bucket, at `<id>/<id>-<version>.rgplugin`. Packages never change once published, and every version stays available.
+  - `packages.rustgis.app` serves the packages from the `rustgis-plugins` Cloudflare R2 bucket, at `<id>/<id>-<version>.rgplugin` (`<id>/<id>-<version>-<platform>.rgplugin` for a plugin with a package per platform). Packages never change once published, and every version stays available.
 - **Incremental builds:** each push to `main` builds only what changed. `scripts/build.py` reads the previous deploy's `packages.json` and downloads only the packages whose source changed.
 - **Upload before deploy:** `scripts/upload.py` puts the new packages in the bucket, checking each one back, before the registry is deployed. It needs the `CLOUDFLARE_R2_TOKEN` secret (a Cloudflare API token with *Workers R2 Storage: Edit*) and `CLOUDFLARE_ACCOUNT_ID`.
 - **Previews:** each pull request's new packages are published to Cloudflare Pages (`pr-<N>.rustgis-plugins-preview.pages.dev`, the `rustgis-plugins-preview` project) by `plugin-preview.yml`, with an **Open in RustGIS** link that opens web.rustgis.app on the preview's registry (or paste the preview's `registry.json` into **Plugin Manager › Settings › Plugin registry**). The non-preview plugins are listed as published. It needs the `CLOUDFLARE_PAGES_TOKEN` secret (an API token with *Cloudflare Pages: Edit*).

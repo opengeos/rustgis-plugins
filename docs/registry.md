@@ -56,6 +56,38 @@ Process plugins are accepted, with two differences:
 - **They run on the desktop and the command line only**, not in the web app (or a preview's
   **Open in RustGIS** link: try one in the desktop app instead).
 
+### A package per platform
+
+A plugin that ships a program for each platform can release one package per platform, so nobody
+downloads the other platforms' programs (and each package, not their sum, has to fit the 64 MB
+limit and the preview's 25 MiB). Name them by platform in `source`, in place of `url` and
+`sha256`:
+
+```json
+{
+  "id": "my-plugin",
+  "source": {
+    "windows": {"url": "https://github.com/you/my-plugin/releases/download/v1.0.0/my-plugin-1.0.0-windows.rgplugin", "sha256": "..."},
+    "macos": {"url": "https://github.com/you/my-plugin/releases/download/v1.0.0/my-plugin-1.0.0-macos.rgplugin", "sha256": "..."},
+    "linux": {"url": "https://github.com/you/my-plugin/releases/download/v1.0.0/my-plugin-1.0.0-linux.rgplugin", "sha256": "..."}
+  },
+  "categories": ["Analysis"]
+}
+```
+
+- The platforms are `windows`, `macos` and `linux`. List the ones you have a package for:
+  RustGIS downloads the one for the platform it runs on, and elsewhere lists the plugin as
+  *Not available* with the platforms it has.
+- The packages are one plugin: the same `plugin.json` (id, version, permissions, commands, tools)
+  in each, except `run`, which names that platform's program. CI refuses packages whose
+  `plugin.json` differs in anything else; the reviewer checks that their code is the same.
+- This is for process plugins. A WebAssembly module runs everywhere and has one package.
+- Each package is served from
+  `packages.rustgis.app/my-plugin/my-plugin-<version>-<platform>.rgplugin`.
+- It needs a RustGIS that reads a package per platform; an older one doesn't list the plugin.
+  Set `minRustgisVersion` in `plugin.json` to the first release that does.
+- CI runs the Linux package only. Say in the pull request how you ran the others.
+
 CI checks the package's files in place of a module:
 
 - `run` is a program and its arguments (a list of strings), or an object of them by platform
@@ -125,7 +157,8 @@ request's code, publishes only the registry and the packages.
 ## Updating and withdrawing
 
 Release a new version (a new `version` in `plugin.json`), then open a pull request that
-updates `source` in `registry/<id>.json` to the new release's `url` and `sha256`. RustGIS shows
+updates `source` in `registry/<id>.json` to the new release's `url` and `sha256` (those of every
+platform, for a plugin with a package per platform). RustGIS shows
 an **Update** button to everyone with an older version. Published packages never change, so
 CI refuses a different package under a version already published. Every published version
 stays available at its URL.
@@ -142,7 +175,9 @@ Each entry has `id`, `name`, `version`, `description`, `author`, `homepage`, `li
 `minRustgisVersion`, `permissions`, the labels of its `commands`, the names of its `tools` and
 its `tab`. A process plugin's entry also has `"runtime": "process"`, and `"python"` (the Python
 version, such as `"3.12"`) when RustGIS makes it a Python environment; a WebAssembly plugin's
-entry has neither.
+entry has neither. A plugin with a package per platform has `packages` in place of `package`,
+`sha256` and `size`: an object by platform (`windows`, `macos`, `linux`) of each package's
+`package`, `sha256` and `size`.
 
 `packages.json` beside it is the build's index: each plugin's package, full manifest and where it
 came from. The next build reads it to rebuild only what changed.
