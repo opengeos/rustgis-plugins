@@ -435,11 +435,11 @@ def check_panel(m: dict, where: str) -> None:
             problem(f"{where}: panel item {item!r} has unknown kind {kind!r}")
             continue
         command = item.get("command")
-        if (kind == "button" or command is not None) and not (isinstance(command, str) and command in commands):
+        if (kind == "button" or command is not None) and not (isinstance(command, str) and (command in commands or (kind == "form" and command == ""))):
             problem(f"{where}: panel {kind} {item.get('id', command)!r} runs {command!r}, which isn't one of the plugin's commands")
             continue
         widget = item.get("id", command if kind == "button" else None)
-        if not isinstance(widget, str) or not ID_RE.match(widget):
+        if not isinstance(widget, str) or not (ID_RE.fullmatch(widget) if kind == "form" else ID_RE.match(widget)):
             problem(f"{where}: panel {kind} {widget!r} needs a valid id")
         elif widget in seen:
             problem(f"{where}: two panel widgets have the id {widget!r} (a button's id is its command's unless it has one of its own)")
@@ -485,6 +485,25 @@ def check_panel_item(item: dict, kind: str, where: str) -> None:
         if not isinstance(item.get(key, ""), str) or len(item.get(key, "")) > PANEL_DECLARED:
             problem(f"{where}: {key} must be text of at most {PANEL_DECLARED} characters")
             return
+    if kind == "form" and (not isinstance(item.get("shape", ""), str) or item.get("shape", "")):
+        problem(f"{where}: shape is for picks")
+    if kind == "form":
+        # Forms declare no static fields or defaults; fields arrive in command replies.
+        if "command" in item and not isinstance(item["command"], str):
+            problem(f"{where}: command must be text")
+        for key in ("min", "max"):
+            if type(item.get(key, 0)) is not int or item.get(key, 0) != 0:
+                problem(f"{where}: {key} must be zero for a form")
+        for key in ("steps", "search"):
+            if item.get(key, False) is not False:
+                problem(f"{where}: {key} must be false for a form")
+        if item.get("options", []) != [] or not isinstance(item.get("options", []), list):
+            problem(f"{where}: options are for dropdowns (choice)")
+        if item.get("default") is not None:
+            problem(f"{where}: a form has no declared default")
+        if item.get("text", ""):
+            problem(f"{where}: text is for texts")
+        return
     if kind == "text" and item.get("command"):
         problem(f"{where}: a text runs no command")
     if kind == "checkbox" and not item.get("label", "").strip():
