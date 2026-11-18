@@ -1,0 +1,11 @@
+{
+  "id": "isoliner3d",
+  "source": {
+    "url": "https://github.com/Valery35/isoliner-scene/releases/download/rustgis-v0.6.0/isoliner3d-0.6.0.rgplugin",
+    "sha256": "b0ab368688f315eed95a5aecd57d8ae6658921d1ac44ac1ce356b2cfdcaeeae3"
+  },
+  "categories": [
+    "Analysis",
+    "Vector"
+  ]
+}
