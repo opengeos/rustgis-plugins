@@ -128,7 +128,7 @@ def main() -> int:
     ap.add_argument("--runtime", choices=("all", "wasm", "process"), default="all", help="run only WebAssembly or process plugins")
     args = ap.parse_args()
     k, n = (int(x) for x in args.shard.split("/"))
-    registry = json.loads((DIST / "registry.json").read_text())
+    registry = json.loads((DIST / "registry.json").read_text(encoding="utf-8"))
     failures = 0
     with tempfile.TemporaryDirectory() as plugins_dir, tempfile.TemporaryDirectory() as downloads, tempfile.TemporaryDirectory() as home:
         env = clean_env(plugins_dir, home)

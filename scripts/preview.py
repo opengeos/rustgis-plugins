@@ -49,8 +49,8 @@ def make(dist: Path, out: Path) -> int:
     Returns:
         The process exit code.
     """
-    registry = json.loads((dist / "registry.json").read_text())
-    new = [n.strip() for n in (dist / "new.txt").read_text().splitlines() if n.strip()]
+    registry = json.loads((dist / "registry.json").read_text(encoding="utf-8"))
+    new = [n.strip() for n in (dist / "new.txt").read_text(encoding="utf-8").splitlines() if n.strip()]
     if out.exists():
         shutil.rmtree(out)
     (out / "packages").mkdir(parents=True)
@@ -71,7 +71,7 @@ def make(dist: Path, out: Path) -> int:
                     ref["package"] = f"packages/{name}"
                     if not any(p["id"] == pid for p in previewed):
                         previewed.append({"id": pid, "name": e.get("name", pid), "version": e.get("version", "")})
-    (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
+    (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"preview: {len(previewed)} plugin(s) from this pull request: {', '.join(p['id'] for p in previewed) or 'none'}")
     return 0
 
@@ -323,10 +323,10 @@ def site(data: Path, pr: str, sha: str, out: Path, published: dict | None = None
     else:
         registry = {"version": 1, "plugins": previewed + kept}
     registry["plugins"].sort(key=lambda e: str(e.get("name", "")).lower())
-    (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n")
+    (out / "registry.json").write_text(json.dumps(registry, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     # RustGIS in the browser fetches the registry and packages from another origin.
-    (out / "_headers").write_text("/*\n  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n")
-    (out / "index.html").write_text(page(pr, sha, previewed))
+    (out / "_headers").write_text("/*\n  Access-Control-Allow-Origin: *\n  X-Content-Type-Options: nosniff\n", encoding="utf-8")
+    (out / "index.html").write_text(page(pr, sha, previewed), encoding="utf-8")
     print(f"preview site: {len(previewed)} plugin(s) for #{pr}")
     return 0
 
