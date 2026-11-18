@@ -299,7 +299,7 @@ def module_strings(data: bytes, known: list[str]) -> tuple[list[str], list[str],
 
 def known_commands() -> list[str]:
     try:
-        lines = COMMANDS.read_text().splitlines()
+        lines = COMMANDS.read_text(encoding="utf-8").splitlines()
     except OSError:
         return []
     # A one-word id (`identify`) matches ordinary text too often to say anything.
@@ -800,7 +800,7 @@ def runs_on(manifest: dict, platform: str) -> bool:
 
 def package_name(folder: Path) -> str:
     """The cargo package name of an in-repository plugin (for `cargo build -p`)."""
-    return tomllib.loads((folder / "Cargo.toml").read_text())["package"]["name"]
+    return tomllib.loads((folder / "Cargo.toml").read_text(encoding="utf-8"))["package"]["name"]
 
 
 def crate_name(folder: Path) -> str:
@@ -1059,7 +1059,7 @@ def inspect_package(rid: str, platform: str | None, src: dict, out: Path, known:
     manifest, wasm = read
     dest = out / "plugins" / rid / platform if platform else out / "plugins" / rid
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / "plugin.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    (dest / "plugin.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         names = z.namelist()
         readme = next((n for n in names if n.rsplit("/", 1)[-1].lower() == "readme.md"), None)
@@ -1072,7 +1072,7 @@ def inspect_package(rid: str, platform: str | None, src: dict, out: Path, known:
     if manifest.get("runtime") == "process":
         # Not sandboxed, and its code is readable: unpack it for review.
         listing = unpack_for_review(data, dest / "files")
-        (dest / "files.txt").write_text("\n".join(listing) + "\n")
+        (dest / "files.txt").write_text("\n".join(listing) + "\n", encoding="utf-8")
         py = manifest.get("python")
         runtime = "process (not sandboxed)" + (f", Python {cell(py.get('version', '3.12'))}" if isinstance(py, dict) else "")
         run = cell(json.dumps(manifest.get("run"), ensure_ascii=False)).replace("`", "'")
@@ -1100,7 +1100,8 @@ def inspect_package(rid: str, platform: str | None, src: dict, out: Path, known:
     (dest / "module.txt").write_text(
         "exports: " + ", ".join(sorted(exports)) + "\nimports: " + ", ".join(imports) + "\nfiles: " + ", ".join(names) + "\n"
         + "commands named in strings (not those built at run time): " + named + "\n"
-        + "URLs named:\n" + "".join(f"  {u}\n" for u in urls)
+        + "URLs named:\n" + "".join(f"  {u}\n" for u in urls),
+        encoding="utf-8",
     )
     rows.append(
         f"| `{pid}` | {version} | wasm | {len(data):,} B | {len(wasm):,} B | {perms} | {', '.join(imports) or 'none'} | {listed} |"
@@ -1118,7 +1119,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
     known = known_commands()
     for f in files:
         try:
-            reg = json.loads((checkout / f).read_text())
+            reg = json.loads((checkout / f).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             notes.append(f"- `{f}`: unreadable ({e})")
             continue
@@ -1153,7 +1154,7 @@ def inspect(checkout: Path, out: Path, files: list[str]) -> int:
             "",
         ]
     report += notes or ["All changed entries with a source were inspected."]
-    (out / "report.md").write_text("\n".join(report) + "\n")
+    (out / "report.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     print("\n".join(report))
     return 0
 
@@ -1262,7 +1263,7 @@ def main() -> int:
     for path in sorted((ROOT / "registry").glob("*.json")):
         where = f"registry/{path.name}"
         try:
-            reg = json.loads(path.read_text())
+            reg = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             problem(f"{where}: {e}")
             continue
@@ -1286,7 +1287,7 @@ def main() -> int:
                 problem(f"{where}: {reg['path']}/plugin.json is missing")
                 continue
             try:
-                local = json.loads(manifest_path.read_text())
+                local = json.loads(manifest_path.read_text(encoding="utf-8"))
                 if not isinstance(local, dict):
                     raise ValueError("not a JSON object")
                 version = str(local.get("version", ""))
@@ -1423,7 +1424,7 @@ def main() -> int:
         )
     print(f"{len(new)} new packages, {sum(len(p.get('platforms', [0])) for p in packages) - len(new)} already published")
 
-    blocklist = json.loads((ROOT / "blocklist.json").read_text())
+    blocklist = json.loads((ROOT / "blocklist.json").read_text(encoding="utf-8"))
     for b in blocklist.get("blocked", []):
         if not ID_RE.match(b.get("id", "")) or ("sha256" in b and not SHA_RE.match(b["sha256"])):
             problem(f"blocklist.json: bad entry {b}")
@@ -1433,11 +1434,11 @@ def main() -> int:
             problem(f"blocklist.json: {b['id']} is blocked but still listed in registry/")
 
     entries.sort(key=lambda e: e["name"].lower())
-    (DIST / "registry.json").write_text(json.dumps({"version": 1, "plugins": entries}, ensure_ascii=False, separators=(",", ":")) + "\n")
-    (DIST / "blocklist.json").write_text(json.dumps(blocklist, indent=2) + "\n")
+    (DIST / "registry.json").write_text(json.dumps({"version": 1, "plugins": entries}, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    (DIST / "blocklist.json").write_text(json.dumps(blocklist, indent=2) + "\n", encoding="utf-8")
     packages.sort(key=lambda p: p["id"])
-    (DIST / "packages.json").write_text(json.dumps({"version": 1, "plugins": packages}, ensure_ascii=False) + "\n")
-    (DIST / "new.txt").write_text("".join(f"{n}\n" for n in new))
+    (DIST / "packages.json").write_text(json.dumps({"version": 1, "plugins": packages}, ensure_ascii=False) + "\n", encoding="utf-8")
+    (DIST / "new.txt").write_text("".join(f"{n}\n" for n in new), encoding="utf-8")
     print(f"{len(entries)} plugins -> {DIST.relative_to(ROOT)}/registry.json")
     if args.check and problems:
         print(f"{len(problems)} problems", file=sys.stderr)

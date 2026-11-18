@@ -51,7 +51,7 @@ def fetch(url: str) -> bytes | None:
 
 def main() -> int:
     """Uploads every new package; returns the exit code."""
-    names = [n.strip() for n in (DIST / "new.txt").read_text().splitlines() if n.strip()]
+    names = [n.strip() for n in (DIST / "new.txt").read_text(encoding="utf-8").splitlines() if n.strip()]
     failures = 0
     for name in names:
         # <id>/<id>-<version>.rgplugin and nothing else: never a key outside the plugin's prefix.

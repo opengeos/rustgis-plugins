@@ -107,7 +107,7 @@ def load_manifests() -> dict:
     Returns:
         Manifests by plugin id.
     """
-    index = json.loads((DIST / "packages.json").read_text())
+    index = json.loads((DIST / "packages.json").read_text(encoding="utf-8"))
     return {p["id"]: p.get("manifest") or {} for p in index.get("plugins", [])}
 
 
@@ -313,7 +313,7 @@ def render_page(entry: dict, manifest: dict) -> str:
 
 def main() -> None:
     """Writes docs/catalog.md and docs/catalog/<id>.md from dist/registry.json."""
-    registry = json.loads((DIST / "registry.json").read_text())
+    registry = json.loads((DIST / "registry.json").read_text(encoding="utf-8"))
     manifests = load_manifests()
     entries = []
     for e in registry.get("plugins", []):
@@ -321,7 +321,7 @@ def main() -> None:
         if not PLUGIN_ID.fullmatch(str(e.get("id", ""))) or not packages or not all(safe_url(pkg.get("package")) for _, pkg in packages):
             raise SystemExit(f"refusing to write a page for {e.get('id')!r}")
         entries.append((e, manifests.get(e["id"], {})))
-    (DOCS / "catalog.md").write_text(render_catalog(len(entries)))
+    (DOCS / "catalog.md").write_text(render_catalog(len(entries)), encoding="utf-8")
     # The catalog reads registry.json from the site's root; a copy in docs/ lets a local
     # `zensical serve` show it too (deploys put the same file there).
     shutil.copyfile(DIST / "registry.json", DOCS / "registry.json")
@@ -330,7 +330,7 @@ def main() -> None:
     for old in pages.glob("*.md"):
         old.unlink()
     for e, m in entries:
-        (pages / f"{e['id']}.md").write_text(render_page(e, m))
+        (pages / f"{e['id']}.md").write_text(render_page(e, m), encoding="utf-8")
     print(f"wrote docs/catalog.md and {len(entries)} plugin pages")
 
 
