@@ -1,0 +1,11 @@
+{
+  "id": "fishnet-grid",
+  "source": {
+    "url": "https://github.com/dingdjfjs-star/rustgis-fishnet-plugin/releases/download/v0.1.0/fishnet-grid-0.1.0.rgplugin",
+    "sha256": "1af51ef9f513601c5bde9fd674e3741163e4f32663be6b47b51f0505e8e2fdf1"
+  },
+  "categories": [
+    "Analysis",
+    "Vector"
+  ]
+}
