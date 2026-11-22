@@ -1,8 +1,8 @@
 {
   "id": "brasildata",
   "source": {
-    "url": "https://github.com/elpidioassinaturas/BrasilData/releases/download/v0.1.59/brasildata-0.1.59.rgplugin",
-    "sha256": "486a62c8d621241c38d8b0e1fd0006bf4b3de6efa14f22bedc89790b182292bf"
+    "url": "https://github.com/elpidioassinaturas/BrasilData/releases/download/v0.1.60/brasildata-0.1.60.rgplugin",
+    "sha256": "7b27530fd186e7187568700359f4bd14d0db824056dfcd68f04723ca04001a59"
   },
   "categories": [
     "Data"
