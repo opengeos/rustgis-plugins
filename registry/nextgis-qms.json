@@ -1,0 +1,12 @@
+{
+  "id": "nextgis-qms",
+  "source": {
+    "url": "https://github.com/nextgis/nextgis-qms-rustgis/releases/download/v1.0.0/nextgis-qms-1.0.0.rgplugin",
+    "sha256": "cfb07a5cf752706671ceb230b8653c7505d133a8328be9d6b1f7fbd863ea6508"
+  },
+  "categories": [
+    "Basemaps",
+    "Data",
+    "Imagery"
+  ]
+}
