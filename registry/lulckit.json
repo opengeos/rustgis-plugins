@@ -1,8 +1,8 @@
 {
   "id": "lulckit",
   "source": {
-    "url": "https://github.com/madeshchkma/LULCkit/releases/download/v0.1.0/lulckit-0.1.0.rgplugin",
-    "sha256": "0f8ec7f8e4c88f30953703c913bdb7d9bce0f228af6ee45f7b0f3d78c6cfad0e"
+    "url": "https://github.com/madeshchkma/LULCkit/releases/download/v0.2.0/lulckit-0.2.0.rgplugin",
+    "sha256": "cbce303e690af6cbb5bc3f9240b0ce3f5f05a2d8547ba288820937f5e3b4886e"
   },
   "categories": [
     "Raster",
