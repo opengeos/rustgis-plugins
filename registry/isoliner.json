@@ -1,8 +1,8 @@
 {
   "id": "isoliner",
   "source": {
-    "url": "https://github.com/Valery35/isoliner-rustgis/releases/download/rustgis-v0.1.4/isoliner-0.1.4.rgplugin",
-    "sha256": "b4a435f040fea8e88d7e26c789ed09acf4337b24e94d4b5b10b5b9010814ba0a"
+    "url": "https://github.com/Valery35/isoliner-rustgis/releases/download/rustgis-v0.1.23/isoliner-0.1.23.rgplugin",
+    "sha256": "effd63ab27548d4400298cbe94ebb545d1ee7fa33bd9d1edc72bb9dc8475687c"
   },
   "categories": [
     "Analysis",
