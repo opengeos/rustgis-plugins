@@ -1,0 +1,13 @@
+{
+  "id": "lulckit",
+  "source": {
+    "url": "https://github.com/madeshchkma/LULCkit/releases/download/v0.1.0/lulckit-0.1.0.rgplugin",
+    "sha256": "0f8ec7f8e4c88f30953703c913bdb7d9bce0f228af6ee45f7b0f3d78c6cfad0e"
+  },
+  "categories": [
+    "Raster",
+    "Imagery",
+    "Analysis",
+    "Cartography"
+  ]
+}
